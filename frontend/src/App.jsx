@@ -7,6 +7,7 @@ import {
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Students from './pages/Students';
+import ProtectedRoute from './routes/ProtectedRoute';
 
 function App() {
   return (
