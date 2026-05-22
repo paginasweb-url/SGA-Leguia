@@ -39,12 +39,33 @@ export const createNewStudent = async (req, res) => {
       data: student
     });
 
-  } catch (error) {
+    } catch (error) {
     console.error(error);
+
+    if (error.code === '23505') {
+      let message = 'Ya existe un registro con esos datos';
+
+      if (error.constraint === 'users_dni_key') {
+        message = 'El DNI ingresado ya está registrado';
+      }
+
+      if (error.constraint === 'users_correo_key') {
+        message = 'El correo ingresado ya está registrado';
+      }
+
+      if (error.constraint === 'estudiantes_codigo_estudiante_key') {
+        message = 'El código de estudiante ya está registrado';
+      }
+
+      return res.status(409).json({
+        success: false,
+        error: message
+      });
+    }
 
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error interno al registrar estudiante'
     });
   }
 };
@@ -79,10 +100,33 @@ export const updateExistingStudent = async (req, res) => {
       data: student
     });
 
-  } catch (error) {
+    } catch (error) {
+    console.error(error);
+
+    if (error.code === '23505') {
+      let message = 'Ya existe un registro con esos datos';
+
+      if (error.constraint === 'users_dni_key') {
+        message = 'El DNI ingresado ya está registrado';
+      }
+
+      if (error.constraint === 'users_correo_key') {
+        message = 'El correo ingresado ya está registrado';
+      }
+
+      if (error.constraint === 'estudiantes_codigo_estudiante_key') {
+        message = 'El código de estudiante ya está registrado';
+      }
+
+      return res.status(409).json({
+        success: false,
+        error: message
+      });
+    }
+
     res.status(500).json({
       success: false,
-      error: error.message
+      error: 'Error interno al registrar estudiante'
     });
   }
 };

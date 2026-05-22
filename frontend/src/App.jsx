@@ -1,10 +1,37 @@
+import {
+  BrowserRouter,
+  Routes,
+  Route
+} from 'react-router-dom';
+
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Students from './pages/Students';
+
 function App() {
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-      <h1 className="text-3xl font-bold text-blue-700">
-        SGA Leguía funcionando
-      </h1>
-    </div>
+    <BrowserRouter>
+
+      <Routes>
+
+        <Route
+          path="/"
+          element={<Login />}
+        />
+
+        <Route
+          path="/dashboard"
+          element={<Dashboard />}
+        />
+
+        <Route
+          path="/students"
+          element={<Students />}
+        />
+
+      </Routes>
+
+    </BrowserRouter>
   );
 }
 
