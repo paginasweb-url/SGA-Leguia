@@ -12,7 +12,6 @@ import ProtectedRoute from './routes/ProtectedRoute';
 function App() {
   return (
     <BrowserRouter>
-
       <Routes>
 
         <Route
@@ -22,16 +21,23 @@ function App() {
 
         <Route
           path="/dashboard"
-          element={<Dashboard />}
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/students"
-          element={<Students />}
+          element={
+            <ProtectedRoute>
+              <Students />
+            </ProtectedRoute>
+          }
         />
 
       </Routes>
-
     </BrowserRouter>
   );
 }
