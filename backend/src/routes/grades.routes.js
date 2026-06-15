@@ -1,14 +1,17 @@
 import express from 'express';
 
 import {
-  getAllUsers,
-  createNewUser,
-  getUser,
-  updateExistingUser,
-  deactivateExistingUser
-} from '../controllers/users.controller.js';
+  getAllGrades,
+  getGrade,
+  createNewGrade,
+  updateExistingGrade,
+  deleteExistingGrade
+} from '../controllers/grades.controller.js';
 
-import { verifyToken, authorizeRoles} from '../middlewares/auth.middleware.js';
+import {
+  verifyToken,
+  authorizeRoles
+} from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -16,35 +19,35 @@ router.get(
   '/',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  getAllUsers
+  getAllGrades
 );
 
 router.get(
   '/:id',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  getUser
+  getGrade
 );
 
 router.post(
   '/',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  createNewUser
+  createNewGrade
 );
 
 router.put(
   '/:id',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  updateExistingUser
+  updateExistingGrade
 );
 
-router.patch(
-  '/:id/deactivate', 
-  verifyToken, 
-  authorizeRoles('Director', 'Administrativo'),
-  deactivateExistingUser
+router.delete(
+  '/:id',
+  verifyToken,
+  authorizeRoles('Director'),
+  deleteExistingGrade
 );
 
 export default router;

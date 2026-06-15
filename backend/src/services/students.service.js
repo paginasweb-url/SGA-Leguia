@@ -3,17 +3,18 @@ import pool from '../config/db.js';
 export const getStudents = async () => {
   const query = `
     SELECT
-    e.id,
-    e.user_id,
-    e.codigo_estudiante,
-    e.fecha_nacimiento,
-    e.direccion,
-    e.estado,
-    u.nombres,
-    u.apellidos,
-    u.dni,
-    u.correo,
-    u.telefono
+      e.id,
+      e.user_id,
+      e.codigo_estudiante,
+      e.fecha_nacimiento,
+      e.direccion,
+      e.estado,
+      u.nombres,
+      u.apellidos,
+      u.dni,
+      u.username,
+      u.correo,
+      u.telefono
     FROM estudiantes e
     INNER JOIN users u
       ON e.user_id = u.id
@@ -36,6 +37,7 @@ export const getStudentById = async (id) => {
       u.nombres,
       u.apellidos,
       u.dni,
+      u.username,
       u.correo,
       u.telefono
     FROM estudiantes e
@@ -60,6 +62,7 @@ export const createStudent = async (studentData) => {
       nombres,
       apellidos,
       dni,
+      username,
       correo,
       telefono,
       password_hash,
@@ -71,10 +74,20 @@ export const createStudent = async (studentData) => {
 
     const userQuery = `
       INSERT INTO users (
-        id, rol_id, nombres, apellidos, dni, correo,
-        telefono, password_hash, estado, created_at
+        id,
+        rol_id,
+        nombres,
+        apellidos,
+        dni,
+        username,
+        correo,
+        telefono,
+        password_hash,
+        estado,
+        must_change_password,
+        created_at
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,NOW())
       RETURNING id
     `;
 
@@ -84,6 +97,7 @@ export const createStudent = async (studentData) => {
       nombres,
       apellidos,
       dni,
+      username,
       correo,
       telefono,
       password_hash,
@@ -94,8 +108,12 @@ export const createStudent = async (studentData) => {
 
     const studentQuery = `
       INSERT INTO estudiantes (
-        user_id, codigo_estudiante, fecha_nacimiento,
-        direccion, estado, created_at
+        user_id,
+        codigo_estudiante,
+        fecha_nacimiento,
+        direccion,
+        estado,
+        created_at
       )
       VALUES ($1,$2,$3,$4,$5,NOW())
       RETURNING *
@@ -131,8 +149,6 @@ export const updateStudent = async (id, studentData) => {
     const {
       nombres,
       apellidos,
-      dni,
-      correo,
       telefono,
       codigo_estudiante,
       fecha_nacimiento,
@@ -157,13 +173,11 @@ export const updateStudent = async (id, studentData) => {
       SET
         nombres = $1,
         apellidos = $2,
-        dni = $3,
-        correo = $4,
-        telefono = $5,
-        estado = $6
-      WHERE id = $7
+        telefono = $3,
+        estado = $4
+      WHERE id = $5
       `,
-      [nombres, apellidos, dni, correo, telefono, estado, userId]
+      [nombres, apellidos, telefono, estado, userId]
     );
 
     const updatedStudent = await client.query(

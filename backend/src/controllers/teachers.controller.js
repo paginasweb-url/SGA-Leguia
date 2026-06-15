@@ -1,13 +1,13 @@
-import {
-  getStudents,
-  createStudent,
-  getStudentById,
-  updateStudent,
-  deactivateStudent
-} from '../services/students.service.js';
-
-import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcrypt';
+import { v4 as uuidv4 } from 'uuid';
+
+import {
+  getTeachers,
+  getTeacherById,
+  createTeacher,
+  updateTeacher,
+  deactivateTeacher
+} from '../services/teachers.service.js';
 
 import { generateCredentials } from '../utils/generateCredentials.js';
 
@@ -27,10 +27,6 @@ const handleDuplicateError = (error, res) => {
       message = 'El usuario institucional ya está registrado';
     }
 
-    if (error.constraint === 'estudiantes_codigo_estudiante_key') {
-      message = 'El código de estudiante ya está registrado';
-    }
-
     return res.status(409).json({
       success: false,
       error: message
@@ -39,22 +35,20 @@ const handleDuplicateError = (error, res) => {
 
   return res.status(500).json({
     success: false,
-    error: 'Error interno al registrar estudiante'
+    error: error.message
   });
 };
 
-export const getAllStudents = async (req, res) => {
+export const getAllTeachers = async (req, res) => {
   try {
-    const students = await getStudents();
+    const teachers = await getTeachers();
 
     res.json({
       success: true,
-      data: students
+      data: teachers
     });
 
   } catch (error) {
-    console.error(error);
-
     res.status(500).json({
       success: false,
       error: error.message
@@ -62,7 +56,26 @@ export const getAllStudents = async (req, res) => {
   }
 };
 
-export const createNewStudent = async (req, res) => {
+export const getTeacher = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const teacher = await getTeacherById(id);
+
+    res.json({
+      success: true,
+      data: teacher
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const createNewTeacher = async (req, res) => {
   try {
     const { password_hash, dni } = req.body;
 
@@ -80,23 +93,23 @@ export const createNewStudent = async (req, res) => {
       });
     }
 
-    const credentials = generateCredentials('Estudiante', dni);
+    const credentials = generateCredentials('Docente', dni);
     const hashedPassword = await bcrypt.hash(password_hash, 10);
 
-    const studentData = {
+    const teacherData = {
       id: uuidv4(),
-      rol_id: 5,
+      rol_id: 4,
       ...req.body,
       username: credentials.username,
       correo: credentials.correo,
       password_hash: hashedPassword
     };
 
-    const student = await createStudent(studentData);
+    const teacher = await createTeacher(teacherData);
 
     res.status(201).json({
       success: true,
-      data: student
+      data: teacher
     });
 
   } catch (error) {
@@ -105,34 +118,15 @@ export const createNewStudent = async (req, res) => {
   }
 };
 
-export const getStudent = async (req, res) => {
+export const updateExistingTeacher = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const student = await getStudentById(id);
+    const teacher = await updateTeacher(id, req.body);
 
     res.json({
       success: true,
-      data: student
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-export const updateExistingStudent = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const student = await updateStudent(id, req.body);
-
-    res.json({
-      success: true,
-      data: student
+      data: teacher
     });
 
   } catch (error) {
@@ -141,16 +135,16 @@ export const updateExistingStudent = async (req, res) => {
   }
 };
 
-export const deactivateExistingStudent = async (req, res) => {
+export const deactivateExistingTeacher = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const student = await deactivateStudent(id);
+    const teacher = await deactivateTeacher(id);
 
     res.json({
       success: true,
-      message: 'Estudiante desactivado correctamente',
-      data: student
+      message: 'Docente desactivado correctamente',
+      data: teacher
     });
 
   } catch (error) {

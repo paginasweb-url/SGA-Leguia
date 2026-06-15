@@ -1,14 +1,17 @@
 import express from 'express';
 
 import {
-  getAllUsers,
-  createNewUser,
-  getUser,
-  updateExistingUser,
-  deactivateExistingUser
-} from '../controllers/users.controller.js';
+  getAllSections,
+  getSection,
+  createNewSection,
+  updateExistingSection,
+  deleteExistingSection
+} from '../controllers/sections.controller.js';
 
-import { verifyToken, authorizeRoles} from '../middlewares/auth.middleware.js';
+import {
+  verifyToken,
+  authorizeRoles
+} from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -16,35 +19,35 @@ router.get(
   '/',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  getAllUsers
+  getAllSections
 );
 
 router.get(
   '/:id',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  getUser
+  getSection
 );
 
 router.post(
   '/',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  createNewUser
+  createNewSection
 );
 
 router.put(
   '/:id',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  updateExistingUser
+  updateExistingSection
 );
 
-router.patch(
-  '/:id/deactivate', 
-  verifyToken, 
-  authorizeRoles('Director', 'Administrativo'),
-  deactivateExistingUser
+router.delete(
+  '/:id',
+  verifyToken,
+  authorizeRoles('Director'),
+  deleteExistingSection
 );
 
 export default router;

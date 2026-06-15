@@ -1,13 +1,17 @@
 import pool from '../config/db.js';
 
 export const getUsers = async () => {
-
   const query = `
     SELECT 
       u.id,
+      u.rol_id,
       u.nombres,
       u.apellidos,
+      u.dni,
+      u.username,
       u.correo,
+      u.telefono,
+      u.estado,
       r.nombre AS rol
     FROM users u
     INNER JOIN roles r
@@ -21,13 +25,13 @@ export const getUsers = async () => {
 };
 
 export const createUser = async (userData) => {
-
   const {
     id,
     rol_id,
     nombres,
     apellidos,
     dni,
+    username,
     correo,
     telefono,
     password_hash,
@@ -41,14 +45,16 @@ export const createUser = async (userData) => {
       nombres,
       apellidos,
       dni,
+      username,
       correo,
       telefono,
       password_hash,
       estado,
+      must_change_password,
       created_at
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,NOW()
     )
     RETURNING *
   `;
@@ -59,6 +65,7 @@ export const createUser = async (userData) => {
     nombres,
     apellidos,
     dni,
+    username,
     correo,
     telefono,
     password_hash,
@@ -68,17 +75,20 @@ export const createUser = async (userData) => {
   const result = await pool.query(query, values);
 
   return result.rows[0];
-  
-  };
+};
 
-  export const getUserById = async (id) => {
-
+export const getUserById = async (id) => {
   const query = `
     SELECT 
       u.id,
+      u.rol_id,
       u.nombres,
       u.apellidos,
+      u.dni,
+      u.username,
       u.correo,
+      u.telefono,
+      u.estado,
       r.nombre AS rol
     FROM users u
     INNER JOIN roles r
@@ -92,7 +102,6 @@ export const createUser = async (userData) => {
 };
 
 export const updateUser = async (id, userData) => {
-
   const {
     rol_id,
     nombres,
@@ -127,10 +136,10 @@ export const updateUser = async (id, userData) => {
   return result.rows[0];
 };
 
-export const deleteUser = async (id) => {
-
+export const deactivateUser = async (id) => {
   const query = `
-    DELETE FROM users
+    UPDATE users
+    SET estado = 'inactivo'
     WHERE id = $1
     RETURNING *
   `;

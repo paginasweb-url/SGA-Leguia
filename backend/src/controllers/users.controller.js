@@ -1,6 +1,7 @@
-import { getUsers, createUser, getUserById, updateUser, deleteUser} from '../services/users.service.js';
+import { getUsers, createUser, getUserById, updateUser, deactivateUser} from '../services/users.service.js';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
+import { generateCredentials } from '../utils/generateCredentials.js';
 
 export const getAllUsers = async (req, res) => {
 
@@ -30,10 +31,24 @@ export const createNewUser = async (req, res) => {
   const hashedPassword = await bcrypt.hash(req.body.password_hash, 10);
 
   try {
+    const roleMap = {
+    1: 'Director',
+    2: 'Administrativo',
+    3: 'Auxiliar',
+    4: 'Docente',
+    5: 'Estudiante',
+    6: 'Apoderado'
+  };
+
+  const roleName = roleMap[req.body.rol_id];
+
+  const credentials = generateCredentials(roleName, req.body.dni);
 
     const userData = {
       id: uuidv4(),
       ...req.body,
+      username: credentials.username,
+      correo: credentials.correo,
       password_hash: hashedPassword
     };
 
@@ -106,27 +121,24 @@ export const updateExistingUser = async (req, res) => {
   }
 };
 
-export const deleteExistingUser = async (req, res) => {
-
+export const deactivateExistingUser = async (req, res) => {
   try {
-
     const { id } = req.params;
 
-    const deletedUser = await deleteUser(id);
+    const user = await deactivateUser(id);
 
     res.json({
       success: true,
-      data: deletedUser
+      message: 'Usuario desactivado correctamente',
+      data: user
     });
 
   } catch (error) {
-
     console.error(error);
 
     res.status(500).json({
       success: false,
       error: error.message
     });
-
   }
 };

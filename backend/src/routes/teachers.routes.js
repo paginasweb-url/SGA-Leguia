@@ -1,14 +1,17 @@
 import express from 'express';
 
 import {
-  getAllUsers,
-  createNewUser,
-  getUser,
-  updateExistingUser,
-  deactivateExistingUser
-} from '../controllers/users.controller.js';
+  getAllTeachers,
+  getTeacher,
+  createNewTeacher,
+  updateExistingTeacher,
+  deactivateExistingTeacher
+} from '../controllers/teachers.controller.js';
 
-import { verifyToken, authorizeRoles} from '../middlewares/auth.middleware.js';
+import {
+  verifyToken,
+  authorizeRoles
+} from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -16,35 +19,35 @@ router.get(
   '/',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  getAllUsers
+  getAllTeachers
 );
 
 router.get(
   '/:id',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  getUser
+  getTeacher
 );
 
 router.post(
   '/',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  createNewUser
+  createNewTeacher
 );
 
 router.put(
   '/:id',
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  updateExistingUser
+  updateExistingTeacher
 );
 
 router.patch(
-  '/:id/deactivate', 
-  verifyToken, 
+  '/:id/deactivate',
+  verifyToken,
   authorizeRoles('Director', 'Administrativo'),
-  deactivateExistingUser
+  deactivateExistingTeacher
 );
 
 export default router;
