@@ -1,0 +1,25 @@
+# Node
+node_modules/
+
+# Env
+.env
+
+# Logs
+logs
+*.log
+
+# Build
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vite
+.vite/
+
+# IDE
+.vscode/
+
+# Supabase
+.supabase/
