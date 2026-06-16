@@ -63,46 +63,10 @@ export const getAllStudents = async (req, res) => {
 };
 
 export const createNewStudent = async (req, res) => {
-  try {
-    const { password_hash, dni } = req.body;
-
-    if (!dni) {
-      return res.status(400).json({
-        success: false,
-        error: 'El DNI es obligatorio'
-      });
-    }
-
-    if (!password_hash) {
-      return res.status(400).json({
-        success: false,
-        error: 'La contraseña inicial es obligatoria'
-      });
-    }
-
-    const credentials = generateCredentials('Estudiante', dni);
-    const hashedPassword = await bcrypt.hash(password_hash, 10);
-
-    const studentData = {
-      id: uuidv4(),
-      rol_id: 5,
-      ...req.body,
-      username: credentials.username,
-      correo: credentials.correo,
-      password_hash: hashedPassword
-    };
-
-    const student = await createStudent(studentData);
-
-    res.status(201).json({
-      success: true,
-      data: student
-    });
-
-  } catch (error) {
-    console.error(error);
-    handleDuplicateError(error, res);
-  }
+  return res.status(403).json({
+    success: false,
+    error: 'Los estudiantes se crean únicamente mediante una matrícula aprobada'
+  });
 };
 
 export const getStudent = async (req, res) => {

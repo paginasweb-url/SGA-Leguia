@@ -3,7 +3,9 @@ import {
   createTeacherCourse,
   getTeacherCoursesByTeacher,
   getTeacherCoursesByClassroom,
-  deleteTeacherCourse
+  deleteTeacherCourse,
+  getTeacherCoursesByUserId,
+  getTeacherStudentsByUserId
 } from '../services/teacherCourse.service.js';
 
 export const getAllTeacherCourses = async (req, res) => {
@@ -101,6 +103,44 @@ export const deleteExistingTeacherCourse = async (req, res) => {
     });
 
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getMyTeacherCourses = async (req, res) => {
+  try {
+    const assignments = await getTeacherCoursesByUserId(req.user.id);
+
+    res.json({
+      success: true,
+      data: assignments
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getMyTeacherStudents = async (req, res) => {
+  try {
+    const students = await getTeacherStudentsByUserId(req.user.id);
+
+    res.json({
+      success: true,
+      data: students
+    });
+
+  } catch (error) {
+    console.error(error);
+
     res.status(500).json({
       success: false,
       error: error.message

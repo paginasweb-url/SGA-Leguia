@@ -5,7 +5,8 @@ import {
   getCourse,
   createNewCourse,
   updateExistingCourse,
-  deleteExistingCourse
+  deleteExistingCourse,
+  getMyCourses
 } from '../controllers/courses.controller.js';
 
 import {
@@ -20,6 +21,13 @@ router.get(
   verifyToken,
   authorizeRoles('Director', 'Administrativo', 'Docente'),
   getAllCourses
+);
+
+router.get(
+  '/me',
+  verifyToken,
+  authorizeRoles('Estudiante'),
+  getMyCourses
 );
 
 router.get(

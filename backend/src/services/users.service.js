@@ -1,6 +1,15 @@
 import pool from '../config/db.js';
 
-export const getUsers = async () => {
+export const getUsers = async ({ requesterRole }) => {
+  const values = [];
+  let whereClause = '';
+
+  if (requesterRole === 'Administrativo') {
+    whereClause = `
+      WHERE r.nombre IN ('Estudiante', 'Docente', 'Apoderado')
+    `;
+  }
+
   const query = `
     SELECT 
       u.id,
@@ -12,15 +21,17 @@ export const getUsers = async () => {
       u.correo,
       u.telefono,
       u.estado,
+      u.must_change_password,
+      u.created_at,
       r.nombre AS rol
     FROM users u
     INNER JOIN roles r
       ON u.rol_id = r.id
+    ${whereClause}
     ORDER BY u.created_at DESC
   `;
 
-  const result = await pool.query(query);
-
+  const result = await pool.query(query, values);
   return result.rows;
 };
 
@@ -35,7 +46,7 @@ export const createUser = async (userData) => {
     correo,
     telefono,
     password_hash,
-    estado
+    estado = 'activo'
   } = userData;
 
   const query = `
@@ -54,9 +65,20 @@ export const createUser = async (userData) => {
       created_at
     )
     VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,NOW()
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,NOW()
     )
-    RETURNING *
+    RETURNING
+      id,
+      rol_id,
+      nombres,
+      apellidos,
+      dni,
+      username,
+      correo,
+      telefono,
+      estado,
+      must_change_password,
+      created_at
   `;
 
   const values = [
@@ -73,7 +95,6 @@ export const createUser = async (userData) => {
   ];
 
   const result = await pool.query(query, values);
-
   return result.rows[0];
 };
 
@@ -89,21 +110,22 @@ export const getUserById = async (id) => {
       u.correo,
       u.telefono,
       u.estado,
+      u.must_change_password,
+      u.created_at,
       r.nombre AS rol
     FROM users u
     INNER JOIN roles r
       ON u.rol_id = r.id
     WHERE u.id = $1
+    LIMIT 1
   `;
 
   const result = await pool.query(query, [id]);
-
   return result.rows[0];
 };
 
 export const updateUser = async (id, userData) => {
   const {
-    rol_id,
     nombres,
     apellidos,
     telefono,
@@ -113,17 +135,26 @@ export const updateUser = async (id, userData) => {
   const query = `
     UPDATE users
     SET
-      rol_id = $1,
-      nombres = $2,
-      apellidos = $3,
-      telefono = $4,
-      estado = $5
-    WHERE id = $6
-    RETURNING *
+      nombres = COALESCE($1, nombres),
+      apellidos = COALESCE($2, apellidos),
+      telefono = COALESCE($3, telefono),
+      estado = COALESCE($4, estado)
+    WHERE id = $5
+    RETURNING
+      id,
+      rol_id,
+      nombres,
+      apellidos,
+      dni,
+      username,
+      correo,
+      telefono,
+      estado,
+      must_change_password,
+      created_at
   `;
 
   const values = [
-    rol_id,
     nombres,
     apellidos,
     telefono,
@@ -132,7 +163,6 @@ export const updateUser = async (id, userData) => {
   ];
 
   const result = await pool.query(query, values);
-
   return result.rows[0];
 };
 
@@ -141,10 +171,20 @@ export const deactivateUser = async (id) => {
     UPDATE users
     SET estado = 'inactivo'
     WHERE id = $1
-    RETURNING *
+    RETURNING
+      id,
+      rol_id,
+      nombres,
+      apellidos,
+      dni,
+      username,
+      correo,
+      telefono,
+      estado,
+      must_change_password,
+      created_at
   `;
 
   const result = await pool.query(query, [id]);
-
   return result.rows[0];
 };

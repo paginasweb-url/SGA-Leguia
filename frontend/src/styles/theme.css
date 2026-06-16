@@ -1,0 +1,532 @@
+:root {
+  color-scheme: light;
+}
+
+html.theme-dark {
+  color-scheme: dark;
+}
+
+/* =========================
+   PALETA MODO OSCURO
+   Fondo: azul noche
+   Cards: azul marino grisáceo
+   Acento: cian premium
+========================= */
+
+html.theme-dark body {
+  background:
+    radial-gradient(circle at top right, rgba(0, 180, 216, 0.12), transparent 32%),
+    linear-gradient(135deg, #0b132b 0%, #0d1b2a 48%, #111827 100%) !important;
+  color: #f8fafc !important;
+}
+
+/* Fondos generales */
+html.theme-dark .bg-white {
+  background-color: #1c2541 !important;
+}
+
+html.theme-dark .bg-slate-50 {
+  background-color: #111a2f !important;
+}
+
+html.theme-dark .bg-slate-100 {
+  background-color: #24304f !important;
+}
+
+html.theme-dark .bg-brand-50 {
+  background-color: rgba(0, 180, 216, 0.12) !important;
+}
+
+html.theme-dark .bg-brand-950 {
+  background:
+    radial-gradient(circle at top right, rgba(0, 180, 216, 0.18), transparent 34%),
+    linear-gradient(135deg, #15345c 0%, #101f3a 55%, #0b132b 100%) !important;
+}
+
+html.theme-dark .bg-brand-900,
+html.theme-dark .bg-brand-800 {
+  background-color: #2563eb !important;
+}
+
+/* Reemplazo del dorado por cian premium en modo oscuro */
+html.theme-dark .bg-gold-500 {
+  background-color: #00b4d8 !important;
+}
+
+html.theme-dark .bg-gold-400 {
+  background-color: #4ea8de !important;
+}
+
+html.theme-dark .bg-gold-100 {
+  background-color: rgba(0, 180, 216, 0.14) !important;
+}
+
+html.theme-dark .text-gold-500,
+html.theme-dark .text-gold-600,
+html.theme-dark .text-gold-700 {
+  color: #90e0ef !important;
+}
+
+/* Texto oscuro sobre botones cian */
+html.theme-dark .bg-gold-500.text-brand-950,
+html.theme-dark .bg-gold-400.text-brand-950,
+html.theme-dark .bg-gold-500 .text-brand-950,
+html.theme-dark .bg-gold-400 .text-brand-950 {
+  color: #061624 !important;
+}
+
+/* Amarillos Tailwind convertidos a cian suave */
+html.theme-dark .bg-yellow-100 {
+  background-color: rgba(0, 180, 216, 0.14) !important;
+}
+
+html.theme-dark .bg-yellow-400,
+html.theme-dark .bg-yellow-500 {
+  background-color: #00b4d8 !important;
+}
+
+html.theme-dark .text-yellow-700,
+html.theme-dark .text-yellow-600,
+html.theme-dark .text-yellow-500 {
+  color: #90e0ef !important;
+}
+
+/* Textos */
+html.theme-dark .text-brand-950,
+html.theme-dark .text-brand-900,
+html.theme-dark .text-slate-900,
+html.theme-dark .text-slate-800,
+html.theme-dark .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+html.theme-dark .text-slate-600,
+html.theme-dark .text-slate-500,
+html.theme-dark .text-slate-400 {
+  color: #cbd5e1 !important;
+}
+
+html.theme-dark .text-slate-300 {
+  color: #dbeafe !important;
+}
+
+html.theme-dark .text-slate-200 {
+  color: #e2e8f0 !important;
+}
+
+html.theme-dark .text-blue-100 {
+  color: #dbeafe !important;
+}
+
+/* Bordes */
+html.theme-dark .border-slate-50,
+html.theme-dark .border-slate-100,
+html.theme-dark .border-slate-200,
+html.theme-dark .border-slate-300 {
+  border-color: rgba(144, 224, 239, 0.18) !important;
+}
+
+html.theme-dark .border-white\/10 {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+/* Inputs */
+html.theme-dark input,
+html.theme-dark select,
+html.theme-dark textarea {
+  background-color: #101b2d !important;
+  color: #f8fafc !important;
+  border-color: rgba(144, 224, 239, 0.22) !important;
+}
+
+html.theme-dark input::placeholder,
+html.theme-dark textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+html.theme-dark input[type='text']:focus,
+html.theme-dark input[type='search']:focus,
+html.theme-dark input[type='password']:focus,
+html.theme-dark input[type='date']:focus,
+html.theme-dark select:focus,
+html.theme-dark textarea:focus {
+  background-color: #16243a !important;
+  border-color: rgba(0, 180, 216, 0.65) !important;
+}
+
+/* Tablas */
+html.theme-dark table thead {
+  background-color: #111a2f !important;
+}
+
+html.theme-dark table tbody tr:hover {
+  background-color: rgba(36, 48, 79, 0.75) !important;
+}
+
+html.theme-dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(144, 224, 239, 0.14) !important;
+}
+
+/* Sombras */
+html.theme-dark .shadow-soft {
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* Estados */
+html.theme-dark .bg-green-100,
+html.theme-dark .bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.14) !important;
+}
+
+html.theme-dark .text-green-700,
+html.theme-dark .text-green-600 {
+  color: #86efac !important;
+}
+
+html.theme-dark .border-green-100 {
+  border-color: rgba(34, 197, 94, 0.24) !important;
+}
+
+html.theme-dark .bg-blue-100,
+html.theme-dark .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.16) !important;
+}
+
+html.theme-dark .text-blue-700,
+html.theme-dark .text-blue-600 {
+  color: #93c5fd !important;
+}
+
+html.theme-dark .bg-red-100,
+html.theme-dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.14) !important;
+}
+
+html.theme-dark .text-red-700,
+html.theme-dark .text-red-600,
+html.theme-dark .text-danger {
+  color: #fca5a5 !important;
+}
+
+html.theme-dark .border-red-100 {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+/* Hover corregido: evita blanco sobre texto claro */
+html.theme-dark .hover\:bg-brand-50:hover {
+  background-color: rgba(0, 180, 216, 0.14) !important;
+}
+
+html.theme-dark .hover\:text-brand-950:hover {
+  color: #e0f7ff !important;
+}
+
+html.theme-dark .hover\:bg-slate-50:hover {
+  background-color: rgba(36, 48, 79, 0.78) !important;
+}
+
+html.theme-dark .hover\:bg-slate-100:hover {
+  background-color: rgba(47, 61, 98, 0.85) !important;
+}
+
+html.theme-dark .hover\:bg-brand-900:hover {
+  background-color: #1d4ed8 !important;
+}
+
+html.theme-dark .hover\:bg-red-50:hover {
+  background-color: rgba(239, 68, 68, 0.12) !important;
+}
+
+html.theme-dark .hover\:text-danger:hover {
+  color: #fca5a5 !important;
+}
+
+/* Gradientes claros convertidos a oscuros */
+html.theme-dark .from-brand-50,
+html.theme-dark .from-white,
+html.theme-dark .from-slate-50,
+html.theme-dark .from-gold-50 {
+  --tw-gradient-from: #0b132b var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(11, 19, 43, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+html.theme-dark .via-white,
+html.theme-dark .via-slate-50,
+html.theme-dark .via-brand-50,
+html.theme-dark .via-gold-50 {
+  --tw-gradient-to: rgba(13, 27, 42, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #0d1b2a var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+html.theme-dark .to-white,
+html.theme-dark .to-slate-50,
+html.theme-dark .to-slate-100,
+html.theme-dark .to-gold-50,
+html.theme-dark .to-brand-50 {
+  --tw-gradient-to: #111827 var(--tw-gradient-to-position) !important;
+}
+
+/* Fondos transparentes */
+html.theme-dark .bg-white\/95,
+html.theme-dark .bg-white\/90,
+html.theme-dark .bg-white\/80,
+html.theme-dark .bg-white\/75,
+html.theme-dark .bg-white\/70,
+html.theme-dark .bg-white\/60 {
+  background-color: rgba(28, 37, 65, 0.94) !important;
+}
+
+html.theme-dark .bg-slate-50\/95,
+html.theme-dark .bg-slate-50\/90,
+html.theme-dark .bg-slate-50\/80,
+html.theme-dark .bg-slate-100\/80 {
+  background-color: rgba(17, 26, 47, 0.94) !important;
+}
+
+/* Contenedores principales */
+html.theme-dark .min-h-screen,
+html.theme-dark .min-h-\[100vh\] {
+  background-color: #0b132b !important;
+}
+
+/* Barras superiores y blur */
+html.theme-dark .backdrop-blur-xl,
+html.theme-dark .backdrop-blur-sm {
+  background-color: rgba(11, 19, 43, 0.88) !important;
+}
+
+/* Cards internas */
+html.theme-dark .rounded-\[2rem\],
+html.theme-dark .rounded-3xl,
+html.theme-dark .rounded-2xl {
+  border-color: rgba(144, 224, 239, 0.14);
+}
+
+/* Botones blancos dentro de modo oscuro */
+html.theme-dark .bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+html.theme-dark .hover\:bg-white\/20:hover {
+  background-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Notificaciones */
+html.theme-dark .bg-yellow-400.text-brand-950,
+html.theme-dark .bg-yellow-500.text-brand-950,
+html.theme-dark .bg-gold-500.text-brand-950 {
+  color: #061624 !important;
+}
+
+html.theme-dark .ring-white,
+html.theme-dark .border-white {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+html.theme-dark .shadow-\[0_-10px_30px_rgba\(15\,23\,42\,0\.08\)\] {
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Menú lateral y móvil */
+html.theme-dark aside {
+  background-color: #0d1b2a !important;
+  border-color: rgba(144, 224, 239, 0.16) !important;
+}
+
+html.theme-dark nav.bg-white\/95 {
+  background-color: rgba(13, 27, 42, 0.96) !important;
+}
+
+/* Scrollbar más discreto */
+html.theme-dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(144, 224, 239, 0.28);
+}
+
+html.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(144, 224, 239, 0.42);
+}
+
+/* =========================
+   AJUSTE FINAL MODO OSCURO
+   Azul más profundo + cian sobrio
+========================= */
+
+/* Fondo general más oscuro */
+html.theme-dark body {
+  background:
+    radial-gradient(circle at top right, rgba(0, 180, 216, 0.08), transparent 34%),
+    linear-gradient(135deg, #070f20 0%, #0a1426 48%, #0d1729 100%) !important;
+}
+
+/* Cards y contenedores principales más oscuros */
+html.theme-dark .bg-white {
+  background-color: #121b31 !important;
+}
+
+html.theme-dark .bg-slate-50 {
+  background-color: #0d1628 !important;
+}
+
+html.theme-dark .bg-slate-100 {
+  background-color: #18243d !important;
+}
+
+/* Sidebar y barra móvil más integradas */
+html.theme-dark aside {
+  background-color: #0a1426 !important;
+  border-color: rgba(144, 224, 239, 0.14) !important;
+}
+
+html.theme-dark nav.bg-white\/95 {
+  background-color: rgba(10, 20, 38, 0.97) !important;
+}
+
+/* Hero principal un poco más oscuro, manteniendo profundidad */
+html.theme-dark .bg-brand-950 {
+  background:
+    radial-gradient(circle at top right, rgba(0, 180, 216, 0.12), transparent 34%),
+    linear-gradient(135deg, #122f56 0%, #0d1d36 55%, #071020 100%) !important;
+}
+
+/* Fondos transparentes más oscuros */
+html.theme-dark .bg-white\/95,
+html.theme-dark .bg-white\/90,
+html.theme-dark .bg-white\/80,
+html.theme-dark .bg-white\/75,
+html.theme-dark .bg-white\/70,
+html.theme-dark .bg-white\/60 {
+  background-color: rgba(18, 27, 49, 0.95) !important;
+}
+
+html.theme-dark .bg-slate-50\/95,
+html.theme-dark .bg-slate-50\/90,
+html.theme-dark .bg-slate-50\/80,
+html.theme-dark .bg-slate-100\/80 {
+  background-color: rgba(13, 22, 40, 0.95) !important;
+}
+
+/* Quitar amarillos claros de iconos y badges */
+html.theme-dark .bg-gold-50,
+html.theme-dark .bg-yellow-50,
+html.theme-dark .bg-amber-50,
+html.theme-dark .bg-orange-50 {
+  background-color: rgba(0, 180, 216, 0.13) !important;
+}
+
+html.theme-dark .bg-gold-100,
+html.theme-dark .bg-yellow-100,
+html.theme-dark .bg-amber-100,
+html.theme-dark .bg-orange-100 {
+  background-color: rgba(0, 180, 216, 0.16) !important;
+}
+
+html.theme-dark .text-gold-500,
+html.theme-dark .text-gold-600,
+html.theme-dark .text-gold-700,
+html.theme-dark .text-yellow-500,
+html.theme-dark .text-yellow-600,
+html.theme-dark .text-yellow-700,
+html.theme-dark .text-amber-500,
+html.theme-dark .text-amber-600,
+html.theme-dark .text-amber-700,
+html.theme-dark .text-orange-500,
+html.theme-dark .text-orange-600,
+html.theme-dark .text-orange-700 {
+  color: #67e8f9 !important;
+}
+
+/* Iconos dentro de cards: mejor contraste */
+html.theme-dark .bg-gold-50 svg,
+html.theme-dark .bg-gold-100 svg,
+html.theme-dark .bg-yellow-50 svg,
+html.theme-dark .bg-yellow-100 svg,
+html.theme-dark .bg-amber-50 svg,
+html.theme-dark .bg-amber-100 svg {
+  color: #67e8f9 !important;
+}
+
+/* Botones cian principales */
+html.theme-dark .bg-gold-500,
+html.theme-dark .bg-yellow-400,
+html.theme-dark .bg-yellow-500,
+html.theme-dark .bg-amber-400,
+html.theme-dark .bg-amber-500 {
+  background-color: #06b6d4 !important;
+  color: #061624 !important;
+}
+
+html.theme-dark .hover\:bg-gold-400:hover,
+html.theme-dark .hover\:bg-yellow-400:hover,
+html.theme-dark .hover\:bg-amber-400:hover {
+  background-color: #22d3ee !important;
+  color: #061624 !important;
+}
+
+/* Hover del menú lateral: nunca blanco */
+html.theme-dark aside a:hover {
+  background-color: rgba(0, 180, 216, 0.12) !important;
+  color: #e0faff !important;
+}
+
+html.theme-dark aside a.bg-brand-900,
+html.theme-dark aside a[class*="bg-brand-900"] {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+html.theme-dark .hover\:bg-brand-50:hover {
+  background-color: rgba(0, 180, 216, 0.12) !important;
+}
+
+html.theme-dark .hover\:text-brand-950:hover {
+  color: #e0faff !important;
+}
+
+/* Bordes más sutiles en cards */
+html.theme-dark .border-slate-50,
+html.theme-dark .border-slate-100,
+html.theme-dark .border-slate-200,
+html.theme-dark .border-slate-300 {
+  border-color: rgba(103, 232, 249, 0.14) !important;
+}
+
+/* Cards con borde más premium */
+html.theme-dark .rounded-3xl,
+html.theme-dark .rounded-2xl,
+html.theme-dark .rounded-\[2rem\] {
+  border-color: rgba(103, 232, 249, 0.13) !important;
+}
+
+/* Notificaciones más visibles */
+html.theme-dark .bg-red-50,
+html.theme-dark .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.16) !important;
+}
+
+html.theme-dark .bg-green-50,
+html.theme-dark .bg-green-100 {
+  background-color: rgba(34, 197, 94, 0.16) !important;
+}
+
+html.theme-dark .bg-blue-50,
+html.theme-dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.16) !important;
+}
+
+/* Mensajes de éxito menos pálidos */
+html.theme-dark .text-green-700,
+html.theme-dark .text-green-600 {
+  color: #86efac !important;
+}
+
+html.theme-dark .border-green-100 {
+  border-color: rgba(34, 197, 94, 0.28) !important;
+}
+
+/* Fondo principal de páginas */
+html.theme-dark .min-h-screen,
+html.theme-dark .min-h-\[100vh\],
+html.theme-dark .min-h-\[calc\(100vh-64px\)\] {
+  background-color: #070f20 !important;
+}

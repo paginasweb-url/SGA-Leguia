@@ -24,6 +24,8 @@ import progressRoutes from './routes/progress.routes.js';
 import passwordRecoveryRoutes from './routes/passwordRecovery.routes.js';
 import enrollmentFormatsRoutes from './routes/enrollmentFormats.routes.js';
 import annualResultsRoutes from './routes/annualResults.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
+import rolesRoutes from './routes/roles.routes.js';
 
 const app = express();
 
@@ -59,5 +61,7 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/password-recovery', passwordRecoveryRoutes);
 app.use('/api/enrollment-formats', enrollmentFormatsRoutes);
 app.use('/api/annual-results', annualResultsRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/roles', rolesRoutes);
 
 export default app;

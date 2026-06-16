@@ -1,5 +1,16 @@
 import pool from '../config/db.js';
 
+const dayOrderSql = `
+  CASE dia_semana
+    WHEN 'Lunes' THEN 1
+    WHEN 'Martes' THEN 2
+    WHEN 'Miércoles' THEN 3
+    WHEN 'Jueves' THEN 4
+    WHEN 'Viernes' THEN 5
+    ELSE 6
+  END
+`;
+
 export const getSchedules = async () => {
   const query = `
     SELECT
@@ -29,7 +40,16 @@ export const getSchedules = async () => {
       ON h.docente_id = d.id
     INNER JOIN users u
       ON d.user_id = u.id
-    ORDER BY h.dia_semana ASC, h.hora_inicio ASC
+    ORDER BY
+    CASE h.dia_semana
+      WHEN 'Lunes' THEN 1
+      WHEN 'Martes' THEN 2
+      WHEN 'Miércoles' THEN 3
+      WHEN 'Jueves' THEN 4
+      WHEN 'Viernes' THEN 5
+      ELSE 6
+    END,
+    h.hora_inicio ASC
   `;
 
   const result = await pool.query(query);
@@ -77,7 +97,7 @@ const validateScheduleData = async (
 
   const classroomResult = await client.query(
     `
-    SELECT id, turno
+    SELECT id, turno, estado
     FROM aulas
     WHERE id = $1
     `,
@@ -86,6 +106,10 @@ const validateScheduleData = async (
 
   if (classroomResult.rows.length === 0) {
     throw new Error('El aula no existe');
+  }
+
+  if (classroomResult.rows[0].estado !== 'activo') {
+    throw new Error('El aula seleccionada no está activa');
   }
 
   const classroomTurn = classroomResult.rows[0].turno;
@@ -124,6 +148,22 @@ const validateScheduleData = async (
     `,
     [docente_id]
   );
+
+  const assignmentResult = await client.query(
+    `
+    SELECT id
+    FROM docente_curso
+    WHERE docente_id = $1
+      AND curso_id = $2
+      AND aula_id = $3
+    LIMIT 1
+    `,
+    [docente_id, curso_id, aula_id]
+  );
+
+  if (assignmentResult.rows.length === 0) {
+    throw new Error('El curso, docente y aula deben estar previamente asignados en docente-curso-aula');
+  }
 
   if (teacherResult.rows.length === 0) {
     throw new Error('El docente no existe');
@@ -375,4 +415,148 @@ export const getSchedulesByTeacher = async (teacherId) => {
 
   const result = await pool.query(query, [teacherId]);
   return result.rows;
+};
+
+export const getSchedulesForUser = async ({ userId, rol }) => {
+  if (['Director', 'Administrativo'].includes(rol)) {
+    return await getSchedules();
+  }
+
+  if (rol === 'Docente') {
+    const query = `
+      SELECT
+        h.id,
+        h.aula_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        a.turno,
+        h.curso_id,
+        c.nombre AS curso,
+        h.docente_id,
+        u.nombres || ' ' || u.apellidos AS docente,
+        h.dia_semana,
+        h.hora_inicio,
+        h.hora_fin,
+        h.created_at
+      FROM horarios h
+      INNER JOIN aulas a ON h.aula_id = a.id
+      INNER JOIN grados g ON a.grado_id = g.id
+      INNER JOIN secciones s ON a.seccion_id = s.id
+      INNER JOIN cursos c ON h.curso_id = c.id
+      INNER JOIN docentes d ON h.docente_id = d.id
+      INNER JOIN users u ON d.user_id = u.id
+      WHERE d.user_id = $1
+      ORDER BY
+        CASE h.dia_semana
+          WHEN 'Lunes' THEN 1
+          WHEN 'Martes' THEN 2
+          WHEN 'Miércoles' THEN 3
+          WHEN 'Jueves' THEN 4
+          WHEN 'Viernes' THEN 5
+          ELSE 6
+        END,
+        h.hora_inicio ASC
+    `;
+
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  }
+
+  if (rol === 'Estudiante') {
+    const query = `
+      SELECT
+        h.id,
+        h.aula_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        a.turno,
+        h.curso_id,
+        c.nombre AS curso,
+        h.docente_id,
+        ud.nombres || ' ' || ud.apellidos AS docente,
+        h.dia_semana,
+        h.hora_inicio,
+        h.hora_fin,
+        h.created_at
+      FROM estudiantes e
+      INNER JOIN matriculas m
+        ON m.estudiante_id = e.id
+        AND m.estado = 'aprobado'
+      INNER JOIN horarios h ON h.aula_id = m.aula_id
+      INNER JOIN aulas a ON h.aula_id = a.id
+      INNER JOIN grados g ON a.grado_id = g.id
+      INNER JOIN secciones s ON a.seccion_id = s.id
+      INNER JOIN cursos c ON h.curso_id = c.id
+      INNER JOIN docentes d ON h.docente_id = d.id
+      INNER JOIN users ud ON d.user_id = ud.id
+      WHERE e.user_id = $1
+      ORDER BY
+        CASE h.dia_semana
+          WHEN 'Lunes' THEN 1
+          WHEN 'Martes' THEN 2
+          WHEN 'Miércoles' THEN 3
+          WHEN 'Jueves' THEN 4
+          WHEN 'Viernes' THEN 5
+          ELSE 6
+        END,
+        h.hora_inicio ASC
+    `;
+
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  }
+
+  if (rol === 'Apoderado') {
+    const query = `
+      SELECT
+        e.id AS estudiante_id,
+        ue.nombres || ' ' || ue.apellidos AS estudiante,
+        ea.parentesco,
+        h.id,
+        h.aula_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        a.turno,
+        h.curso_id,
+        c.nombre AS curso,
+        h.docente_id,
+        ud.nombres || ' ' || ud.apellidos AS docente,
+        h.dia_semana,
+        h.hora_inicio,
+        h.hora_fin,
+        h.created_at
+      FROM apoderados ap
+      INNER JOIN estudiante_apoderado ea ON ea.apoderado_id = ap.id
+      INNER JOIN estudiantes e ON ea.estudiante_id = e.id
+      INNER JOIN users ue ON e.user_id = ue.id
+      INNER JOIN matriculas m
+        ON m.estudiante_id = e.id
+        AND m.estado = 'aprobado'
+      INNER JOIN horarios h ON h.aula_id = m.aula_id
+      INNER JOIN aulas a ON h.aula_id = a.id
+      INNER JOIN grados g ON a.grado_id = g.id
+      INNER JOIN secciones s ON a.seccion_id = s.id
+      INNER JOIN cursos c ON h.curso_id = c.id
+      INNER JOIN docentes d ON h.docente_id = d.id
+      INNER JOIN users ud ON d.user_id = ud.id
+      WHERE ap.user_id = $1
+      ORDER BY
+        ue.apellidos ASC,
+        ue.nombres ASC,
+        CASE h.dia_semana
+          WHEN 'Lunes' THEN 1
+          WHEN 'Martes' THEN 2
+          WHEN 'Miércoles' THEN 3
+          WHEN 'Jueves' THEN 4
+          WHEN 'Viernes' THEN 5
+          ELSE 6
+        END,
+        h.hora_inicio ASC
+    `;
+
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  }
+
+  return [];
 };

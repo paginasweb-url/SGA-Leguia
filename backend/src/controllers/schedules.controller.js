@@ -5,7 +5,8 @@ import {
   updateSchedule,
   deleteSchedule,
   getSchedulesByClassroom,
-  getSchedulesByTeacher
+  getSchedulesByTeacher,
+  getSchedulesForUser
 } from '../services/schedules.service.js';
 
 export const getAllSchedules = async (req, res) => {
@@ -149,6 +150,28 @@ export const getTeacherSchedules = async (req, res) => {
     });
 
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getMySchedules = async (req, res) => {
+  try {
+    const schedules = await getSchedulesForUser({
+      userId: req.user.id,
+      rol: req.user.rol
+    });
+
+    res.json({
+      success: true,
+      data: schedules
+    });
+
+  } catch (error) {
+    console.error(error);
+
     res.status(500).json({
       success: false,
       error: error.message

@@ -1,11 +1,14 @@
 import {
   buildStudentAnnualResult,
+  buildStudentAnnualResultWithRanking,
   buildClassroomAnnualResults,
   buildClassroomAnnualSummary,
   studentOwnsAnnualResult,
   guardianCanAccessAnnualResult,
   teacherCanAccessAnnualStudent,
-  teacherCanAccessAnnualClassroom
+  teacherCanAccessAnnualClassroom,
+  getStudentProfileForAnnualResult,
+  getGuardianChildrenForAnnualResult
 } from '../services/annualResults.service.js';
 
 export const getStudentAnnualResult = async (req, res) => {
@@ -58,7 +61,7 @@ export const getStudentAnnualResult = async (req, res) => {
       }
     }
 
-    const result = await buildStudentAnnualResult(studentId, periodo_id);
+    const result = await buildStudentAnnualResultWithRanking(studentId, periodo_id);
 
     if (!result) {
       return res.status(404).json({
@@ -70,6 +73,83 @@ export const getStudentAnnualResult = async (req, res) => {
     res.json({
       success: true,
       data: result
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getMyAnnualResult = async (req, res) => {
+  try {
+    const { id: userId, rol } = req.user;
+    const { periodo_id } = req.query;
+
+    if (!periodo_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'El período académico es obligatorio'
+      });
+    }
+
+    if (rol === 'Estudiante') {
+      const student = await getStudentProfileForAnnualResult(userId);
+
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          error: 'No se encontró el perfil del estudiante'
+        });
+      }
+
+      const result = await buildStudentAnnualResultWithRanking(
+        student.estudiante_id,
+        periodo_id
+      );
+
+      return res.json({
+        success: true,
+        type: 'student',
+        data: result
+      });
+    }
+
+    if (rol === 'Apoderado') {
+      const children = await getGuardianChildrenForAnnualResult(userId);
+
+      const results = [];
+
+      for (const child of children) {
+        const annualResult = await buildStudentAnnualResultWithRanking(
+          child.estudiante_id,
+          periodo_id
+        );
+
+        if (annualResult) {
+          results.push({
+            parentesco: child.parentesco,
+            result: annualResult
+          });
+        }
+      }
+
+      return res.json({
+        success: true,
+        type: 'guardian',
+        data: {
+          children: results
+        }
+      });
+    }
+
+    return res.status(403).json({
+      success: false,
+      error: 'Este recurso solo está disponible para estudiantes y apoderados'
     });
 
   } catch (error) {

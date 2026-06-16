@@ -201,3 +201,137 @@ export const getAttendanceSummaryByClassroom = async (
   const result = await pool.query(query, values);
   return result.rows;
 };
+
+export const getActiveClassroomsForAttendance = async () => {
+  const query = `
+    SELECT
+      au.id,
+      au.grado_id,
+      g.nombre AS grado,
+      au.seccion_id,
+      s.nombre AS seccion,
+      au.turno,
+      au.capacidad,
+      au.estado,
+      COUNT(m.id)::int AS matriculados
+    FROM aulas au
+    INNER JOIN grados g ON au.grado_id = g.id
+    INNER JOIN secciones s ON au.seccion_id = s.id
+    LEFT JOIN matriculas m
+      ON m.aula_id = au.id
+      AND m.estado = 'aprobado'
+    WHERE au.estado = 'activo'
+    GROUP BY
+      au.id,
+      au.grado_id,
+      g.nombre,
+      au.seccion_id,
+      s.nombre,
+      au.turno,
+      au.capacidad,
+      au.estado
+    ORDER BY au.grado_id ASC, s.nombre ASC, au.turno ASC
+  `;
+
+  const result = await pool.query(query);
+  return result.rows;
+};
+
+export const getAttendanceForUser = async ({ userId, rol }) => {
+  if (rol === 'Estudiante') {
+    const query = `
+      SELECT
+        e.id AS estudiante_id,
+        ue.nombres || ' ' || ue.apellidos AS estudiante,
+        a.id,
+        a.fecha,
+        a.estado,
+        a.observacion,
+        au.id AS aula_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        au.turno
+      FROM estudiantes e
+      INNER JOIN users ue ON e.user_id = ue.id
+      LEFT JOIN asistencias a ON a.estudiante_id = e.id
+      LEFT JOIN aulas au ON a.aula_id = au.id
+      LEFT JOIN grados g ON au.grado_id = g.id
+      LEFT JOIN secciones s ON au.seccion_id = s.id
+      WHERE e.user_id = $1
+      ORDER BY a.fecha DESC
+    `;
+
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  }
+
+  if (rol === 'Apoderado') {
+    const query = `
+      SELECT
+        e.id AS estudiante_id,
+        ue.nombres || ' ' || ue.apellidos AS estudiante,
+        ea.parentesco,
+        a.id,
+        a.fecha,
+        a.estado,
+        a.observacion,
+        au.id AS aula_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        au.turno
+      FROM apoderados ap
+      INNER JOIN estudiante_apoderado ea ON ea.apoderado_id = ap.id
+      INNER JOIN estudiantes e ON ea.estudiante_id = e.id
+      INNER JOIN users ue ON e.user_id = ue.id
+      LEFT JOIN asistencias a ON a.estudiante_id = e.id
+      LEFT JOIN aulas au ON a.aula_id = au.id
+      LEFT JOIN grados g ON au.grado_id = g.id
+      LEFT JOIN secciones s ON au.seccion_id = s.id
+      WHERE ap.user_id = $1
+      ORDER BY ue.apellidos ASC, ue.nombres ASC, a.fecha DESC
+    `;
+
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  }
+
+  if (rol === 'Docente') {
+    const query = `
+      SELECT
+        a.id,
+        a.fecha,
+        a.estado,
+        a.observacion,
+        e.id AS estudiante_id,
+        ue.nombres || ' ' || ue.apellidos AS estudiante,
+        ue.dni,
+        au.id AS aula_id,
+        g.nombre AS grado,
+        s.nombre AS seccion,
+        au.turno,
+        c.id AS curso_id,
+        c.nombre AS curso
+      FROM docentes d
+      INNER JOIN docente_curso dc ON dc.docente_id = d.id
+      INNER JOIN cursos c ON dc.curso_id = c.id
+      INNER JOIN aulas au ON dc.aula_id = au.id
+      INNER JOIN grados g ON au.grado_id = g.id
+      INNER JOIN secciones s ON au.seccion_id = s.id
+      INNER JOIN matriculas m
+        ON m.aula_id = au.id
+        AND m.estado = 'aprobado'
+      INNER JOIN estudiantes e ON m.estudiante_id = e.id
+      INNER JOIN users ue ON e.user_id = ue.id
+      LEFT JOIN asistencias a
+        ON a.estudiante_id = e.id
+        AND a.aula_id = au.id
+      WHERE d.user_id = $1
+      ORDER BY a.fecha DESC, ue.apellidos ASC, ue.nombres ASC
+    `;
+
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  }
+
+  return [];
+};

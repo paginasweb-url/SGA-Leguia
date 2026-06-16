@@ -1,56 +1,78 @@
+import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
 import MobileNav from '../components/MobileNav';
-import { Menu, GraduationCap, Search, Bell, Settings } from 'lucide-react';
+import NotificationsDropdown from '../components/NotificationsDropdown';
+import { Menu, GraduationCap, Search } from 'lucide-react';
+import { getStoredUser } from '../utils/storage';
 
 function DashboardLayout({ children }) {
-  const user = JSON.parse(localStorage.getItem('user'));
+  const user = getStoredUser();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
-      <Sidebar />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      <header className="hidden lg:flex fixed top-0 left-64 right-0 h-14 bg-white/90 backdrop-blur border-b border-slate-200 z-40 items-center justify-between px-6">
+      <header className="hidden lg:flex fixed top-0 left-64 right-0 h-16 bg-white/95 backdrop-blur-xl border-b border-slate-200 z-40 items-center justify-between px-6">
         <div className="relative w-full max-w-md">
-          <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar estudiante, curso o docente..."
-            className="w-full bg-slate-100 border border-transparent rounded-full pl-9 pr-4 py-2 text-sm outline-none focus:bg-white focus:border-blue-200"
-          />
         </div>
 
-        <div className="flex items-center gap-4 text-slate-600">
-          <Bell size={18} />
-          <Settings size={18} />
+        <div className="flex items-center gap-4">
+          <NotificationsDropdown />
 
-          <div className="w-9 h-9 rounded-full bg-blue-900 text-white flex items-center justify-center text-sm font-bold">
-            {user?.nombres?.charAt(0) || 'U'}
+          <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+            <div className="text-right">
+              <p className="text-sm font-extrabold text-brand-950">
+                {user?.nombres || 'Usuario'}
+              </p>
+
+              <p className="text-xs text-slate-500">
+                {user?.rol}
+              </p>
+            </div>
+
+            <div className="w-10 h-10 rounded-full bg-brand-900 text-white flex items-center justify-center text-sm font-extrabold shadow-sm ring-2 ring-gold-500/20">
+              {user?.nombres?.charAt(0) || 'U'}
+            </div>
           </div>
         </div>
       </header>
 
-      <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+      <header className="lg:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-800 text-white flex items-center justify-center">
-            <GraduationCap size={20} />
+          <div className="w-10 h-10 rounded-2xl bg-brand-950 text-gold-500 flex items-center justify-center shadow-sm">
+            <GraduationCap size={21} />
           </div>
 
           <div>
-            <h1 className="font-bold text-sm text-slate-900">
+            <h1 className="font-extrabold text-sm text-brand-950">
               Augusto B. Leguía
             </h1>
+
             <p className="text-[11px] text-slate-500">
               {user?.rol || 'Portal'}
             </p>
           </div>
         </div>
 
-        <button className="p-2 rounded-lg bg-slate-100">
-          <Menu size={21} />
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationsDropdown />
+
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="p-2.5 rounded-2xl bg-brand-50 text-brand-950 border border-brand-100"
+            aria-label="Abrir menú"
+          >
+            <Menu size={21} />
+          </button>
+        </div>
       </header>
 
-      <main className="lg:ml-64 lg:pt-14 p-4 sm:p-6 pb-24">
+      <main className="lg:ml-64 lg:pt-16 p-4 sm:p-6 pb-24">
         {children}
       </main>
 

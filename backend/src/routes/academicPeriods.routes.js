@@ -18,14 +18,14 @@ const router = express.Router();
 router.get(
   '/',
   verifyToken,
-  authorizeRoles('Director', 'Administrativo'),
+  authorizeRoles('Director', 'Administrativo', 'Docente', 'Estudiante', 'Apoderado'),
   getAllAcademicPeriods
 );
 
 router.get(
   '/:id',
   verifyToken,
-  authorizeRoles('Director', 'Administrativo'),
+  authorizeRoles('Director', 'Administrativo', 'Docente', 'Estudiante', 'Apoderado'),
   getAcademicPeriod
 );
 

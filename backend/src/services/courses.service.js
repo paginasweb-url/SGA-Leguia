@@ -62,3 +62,33 @@ export const deleteCourse = async (id) => {
 
   return result.rows[0];
 };
+
+export const getCoursesByStudentUserId = async (userId) => {
+  const query = `
+    SELECT DISTINCT
+      c.id,
+      c.nombre,
+      dc.docente_id,
+      ud.nombres || ' ' || ud.apellidos AS docente,
+      dc.aula_id,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      a.turno
+    FROM estudiantes e
+    INNER JOIN matriculas m
+      ON m.estudiante_id = e.id
+      AND m.estado = 'aprobado'
+    INNER JOIN aulas a ON m.aula_id = a.id
+    INNER JOIN grados g ON a.grado_id = g.id
+    INNER JOIN secciones s ON a.seccion_id = s.id
+    INNER JOIN docente_curso dc ON dc.aula_id = a.id
+    INNER JOIN cursos c ON dc.curso_id = c.id
+    INNER JOIN docentes d ON dc.docente_id = d.id
+    INNER JOIN users ud ON d.user_id = ud.id
+    WHERE e.user_id = $1
+    ORDER BY c.nombre ASC
+  `;
+
+  const result = await pool.query(query, [userId]);
+  return result.rows;
+};

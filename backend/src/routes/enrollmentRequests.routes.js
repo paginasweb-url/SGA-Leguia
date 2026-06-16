@@ -7,7 +7,10 @@ import {
   uploadDocumentToEnrollmentRequest,
   getEnrollmentRequestDocuments,
   updateRequestStatus,
-  trackRequestStatus
+  trackRequestStatus,
+  getPublicEnrollmentOptions,
+  getAvailableClassrooms,
+  downloadDocumentFromEnrollmentRequest
 } from '../controllers/enrollmentRequests.controller.js';
 
 import { upload } from '../middlewares/upload.middleware.js';
@@ -30,6 +33,15 @@ router.get(
   getAllEnrollmentRequests
 );
 
+router.get('/public-options', getPublicEnrollmentOptions);
+
+router.get(
+  '/available-classrooms',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo'),
+  getAvailableClassrooms
+);
+
 router.get(
   '/:id',
   verifyToken,
@@ -48,6 +60,13 @@ router.get(
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
   getEnrollmentRequestDocuments
+);
+
+router.get(
+  '/:id/documents/:documentId/download',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo'),
+  downloadDocumentFromEnrollmentRequest
 );
 
 router.patch(

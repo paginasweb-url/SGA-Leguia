@@ -69,6 +69,18 @@ export const getAnnouncementById = async (id) => {
 };
 
 export const getAnnouncementsForUser = async (userId, rol) => {
+  const roleToTargetType = {
+    Director: 'directores',
+    Administrativo: 'administrativos',
+    Auxiliar: 'auxiliares',
+    Docente: 'docentes',
+    Estudiante: 'estudiantes',
+    Apoderado: 'apoderados'
+  };
+
+  const targetType = roleToTargetType[rol] || String(rol || '').toLowerCase();
+  const singularRole = String(rol || '').toLowerCase();
+
   const query = `
     SELECT
       c.*,
@@ -80,7 +92,8 @@ export const getAnnouncementsForUser = async (userId, rol) => {
       AND cl.user_id = $1
     WHERE
       c.destinatario_tipo = 'general'
-      OR c.destinatario_tipo = LOWER($2)
+      OR c.destinatario_tipo = $2
+      OR c.destinatario_tipo = $3
       OR (
         c.destinatario_tipo = 'aula'
         AND c.aula_id IN (
@@ -105,7 +118,12 @@ export const getAnnouncementsForUser = async (userId, rol) => {
     ORDER BY c.fecha DESC
   `;
 
-  const result = await pool.query(query, [userId, rol]);
+  const result = await pool.query(query, [
+    userId,
+    targetType,
+    singularRole
+  ]);
+
   return result.rows;
 };
 
@@ -145,4 +163,84 @@ export const getAnnouncementReadSummary = async (comunicadoId) => {
 
   const result = await pool.query(query, [comunicadoId]);
   return result.rows[0];
+};
+
+export const validateAnnouncementTargetAccess = async ({
+  userId,
+  rol,
+  destinatario_tipo,
+  aula_id
+}) => {
+  if (destinatario_tipo !== 'aula') {
+    if (rol === 'Docente') {
+      return {
+        allowed: false,
+        error: 'El docente solo puede publicar comunicados para aulas asignadas'
+      };
+    }
+
+    return {
+      allowed: true
+    };
+  }
+
+  if (!aula_id) {
+    return {
+      allowed: false,
+      error: 'El aula es obligatoria para comunicados dirigidos a aula específica'
+    };
+  }
+
+  const classroomResult = await pool.query(
+    `
+    SELECT id
+    FROM aulas
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [aula_id]
+  );
+
+  if (classroomResult.rows.length === 0) {
+    return {
+      allowed: false,
+      error: 'El aula seleccionada no existe'
+    };
+  }
+
+  if (['Director', 'Administrativo'].includes(rol)) {
+    return {
+      allowed: true
+    };
+  }
+
+  if (rol === 'Docente') {
+    const teacherClassroomResult = await pool.query(
+      `
+      SELECT dc.id
+      FROM docente_curso dc
+      INNER JOIN docentes d ON dc.docente_id = d.id
+      WHERE d.user_id = $1
+        AND dc.aula_id = $2
+      LIMIT 1
+      `,
+      [userId, aula_id]
+    );
+
+    if (teacherClassroomResult.rows.length === 0) {
+      return {
+        allowed: false,
+        error: 'No puedes publicar comunicados para un aula no asignada'
+      };
+    }
+
+    return {
+      allowed: true
+    };
+  }
+
+  return {
+    allowed: false,
+    error: 'No tienes permisos para publicar comunicados a esta aula'
+  };
 };

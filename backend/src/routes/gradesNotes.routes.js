@@ -6,7 +6,8 @@ import {
   getClassroomCourseGrades,
   getStudentGrades,
   getClassroomCourseSummary,
-  getRiskStudents
+  getRiskStudents,
+  getMyGrades
 } from '../controllers/gradesNotes.controller.js';
 
 import {
@@ -38,6 +39,13 @@ router.get(
 );
 
 router.get(
+  '/classroom/:aulaId/course/:cursoId/bimester/:bimestre',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo', 'Docente'),
+  getClassroomCourseGrades
+);
+
+router.get(
   '/classroom/:aulaId/course/:cursoId/summary',
   verifyToken,
   authorizeRoles('Director', 'Administrativo', 'Docente'),
@@ -49,6 +57,13 @@ router.get(
   verifyToken,
   authorizeRoles('Director', 'Administrativo', 'Docente'),
   getRiskStudents
+);
+
+router.get(
+  '/me',
+  verifyToken,
+  authorizeRoles('Estudiante', 'Apoderado'),
+  getMyGrades
 );
 
 router.get(

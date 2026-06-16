@@ -3,7 +3,8 @@ import express from 'express';
 import {
   getStudentAnnualResult,
   getClassroomAnnualResults,
-  getClassroomAnnualSummary
+  getClassroomAnnualSummary,
+  getMyAnnualResult
 } from '../controllers/annualResults.controller.js';
 
 import {
@@ -12,6 +13,13 @@ import {
 } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
+
+  router.get(
+    '/me',
+    verifyToken,
+    authorizeRoles('Estudiante', 'Apoderado'),
+    getMyAnnualResult
+  );
 
 router.get(
   '/student/:studentId',

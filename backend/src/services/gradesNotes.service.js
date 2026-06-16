@@ -313,3 +313,147 @@ export const getStudentsAtRisk = async (aulaId, bimestre, periodoId) => {
 
   return result.rows;
 };
+
+export const teacherCanAccessClassroom = async (teacherUserId, aulaId) => {
+  const query = `
+    SELECT dc.id
+    FROM docentes d
+    INNER JOIN docente_curso dc ON dc.docente_id = d.id
+    WHERE d.user_id = $1
+      AND dc.aula_id = $2
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [teacherUserId, aulaId]);
+  return result.rows.length > 0;
+};
+
+export const teacherCanAccessClassroomCourse = async (
+  teacherUserId,
+  aulaId,
+  cursoId
+) => {
+  const query = `
+    SELECT dc.id
+    FROM docentes d
+    INNER JOIN docente_curso dc ON dc.docente_id = d.id
+    WHERE d.user_id = $1
+      AND dc.aula_id = $2
+      AND dc.curso_id = $3
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [
+    teacherUserId,
+    aulaId,
+    cursoId
+  ]);
+
+  return result.rows.length > 0;
+};
+
+export const teacherCanAccessStudentGrades = async (
+  teacherUserId,
+  studentId
+) => {
+  const query = `
+    SELECT dc.id
+    FROM docentes d
+    INNER JOIN docente_curso dc ON dc.docente_id = d.id
+    INNER JOIN matriculas m
+      ON m.aula_id = dc.aula_id
+      AND m.estado = 'aprobado'
+    WHERE d.user_id = $1
+      AND m.estudiante_id = $2
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [
+    teacherUserId,
+    studentId
+  ]);
+
+  return result.rows.length > 0;
+};
+
+export const studentOwnsGrades = async (studentUserId, studentId) => {
+  const query = `
+    SELECT id
+    FROM estudiantes
+    WHERE user_id = $1
+      AND id = $2
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [
+    studentUserId,
+    studentId
+  ]);
+
+  return result.rows.length > 0;
+};
+
+export const guardianCanAccessGrades = async (
+  guardianUserId,
+  studentId
+) => {
+  const query = `
+    SELECT ea.id
+    FROM apoderados ap
+    INNER JOIN estudiante_apoderado ea
+      ON ea.apoderado_id = ap.id
+    WHERE ap.user_id = $1
+      AND ea.estudiante_id = $2
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [
+    guardianUserId,
+    studentId
+  ]);
+
+  return result.rows.length > 0;
+};
+
+export const getStudentProfileByUserId = async (userId) => {
+  const query = `
+    SELECT
+      e.id AS estudiante_id,
+      e.codigo_estudiante,
+      u.nombres,
+      u.apellidos,
+      u.dni
+    FROM estudiantes e
+    INNER JOIN users u ON e.user_id = u.id
+    WHERE e.user_id = $1
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [userId]);
+  return result.rows[0];
+};
+
+export const getGuardianChildrenForGrades = async (guardianUserId) => {
+  const query = `
+    SELECT
+      ea.parentesco,
+      e.id AS estudiante_id,
+      e.codigo_estudiante,
+      u.nombres,
+      u.apellidos,
+      u.dni
+    FROM apoderados ap
+    INNER JOIN estudiante_apoderado ea
+      ON ea.apoderado_id = ap.id
+    INNER JOIN estudiantes e
+      ON ea.estudiante_id = e.id
+    INNER JOIN users u
+      ON e.user_id = u.id
+    WHERE ap.user_id = $1
+      AND e.estado = 'activo'
+    ORDER BY u.apellidos ASC, u.nombres ASC
+  `;
+
+  const result = await pool.query(query, [guardianUserId]);
+  return result.rows;
+};

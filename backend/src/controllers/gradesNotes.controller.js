@@ -4,7 +4,14 @@ import {
   getGradesByClassroomCourseBimester,
   getGradesByStudent,
   getGradesSummaryByClassroomCourse,
-  getStudentsAtRisk
+  getStudentsAtRisk,
+  teacherCanAccessClassroom,
+  teacherCanAccessClassroomCourse,
+  teacherCanAccessStudentGrades,
+  studentOwnsGrades,
+  guardianCanAccessGrades,
+  getStudentProfileByUserId,
+  getGuardianChildrenForGrades
 } from '../services/gradesNotes.service.js';
 
 export const getClassroomStudentsForGrades = async (req, res) => {
@@ -18,6 +25,19 @@ export const getClassroomStudentsForGrades = async (req, res) => {
         error: 'El período académico es obligatorio'
       });
     }
+
+    const { id: userId, rol } = req.user;
+
+      if (rol === 'Docente') {
+        const canAccess = await teacherCanAccessClassroom(userId, aulaId);
+
+        if (!canAccess) {
+          return res.status(403).json({
+            success: false,
+            error: 'Solo puedes consultar estudiantes de tus aulas asignadas'
+          });
+        }
+      }
 
     const students = await getStudentsForGrades(aulaId, periodo_id);
 
@@ -58,6 +78,23 @@ export const registerGrades = async (req, res) => {
       });
     }
 
+    const { id: userId, rol } = req.user;
+
+      if (rol === 'Docente') {
+        const canAccess = await teacherCanAccessClassroomCourse(
+          userId,
+          aula_id,
+          curso_id
+        );
+
+        if (!canAccess) {
+          return res.status(403).json({
+            success: false,
+            error: 'Solo puedes registrar notas de tus cursos y aulas asignadas'
+          });
+        }
+      }
+
     const result = await saveGrades({
       aula_id,
       curso_id,
@@ -79,8 +116,8 @@ export const registerGrades = async (req, res) => {
 
 export const getClassroomCourseGrades = async (req, res) => {
   try {
-    const { aulaId, cursoId } = req.params;
-    const { bimestre, periodo_id } = req.query;
+    const { aulaId, cursoId, bimestre } = req.params;
+    const { periodo_id } = req.query;
 
     if (!bimestre || !periodo_id) {
       return res.status(400).json({
@@ -88,6 +125,23 @@ export const getClassroomCourseGrades = async (req, res) => {
         error: 'El bimestre y el período académico son obligatorios'
       });
     }
+
+    const { id: userId, rol } = req.user;
+
+      if (rol === 'Docente') {
+        const canAccess = await teacherCanAccessClassroomCourse(
+          userId,
+          aulaId,
+          cursoId
+        );
+
+        if (!canAccess) {
+          return res.status(403).json({
+            success: false,
+            error: 'Solo puedes consultar notas de tus cursos asignados'
+          });
+        }
+      }
 
     const grades = await getGradesByClassroomCourseBimester(
       aulaId,
@@ -107,6 +161,43 @@ export const getStudentGrades = async (req, res) => {
   try {
     const { studentId } = req.params;
     const { periodo_id } = req.query;
+    const { id: userId, rol } = req.user;
+
+    if (rol === 'Estudiante') {
+      const ownsGrades = await studentOwnsGrades(userId, studentId);
+
+      if (!ownsGrades) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permiso para ver estas notas'
+        });
+      }
+    }
+
+    if (rol === 'Apoderado') {
+      const canAccess = await guardianCanAccessGrades(userId, studentId);
+
+      if (!canAccess) {
+        return res.status(403).json({
+          success: false,
+          error: 'No tienes permiso para ver las notas de este estudiante'
+        });
+      }
+    }
+
+    if (rol === 'Docente') {
+      const canAccess = await teacherCanAccessStudentGrades(
+        userId,
+        studentId
+      );
+
+      if (!canAccess) {
+        return res.status(403).json({
+          success: false,
+          error: 'Solo puedes ver notas de estudiantes de tus aulas asignadas'
+        });
+      }
+    }
 
     const grades = await getGradesByStudent(studentId, periodo_id || null);
 
@@ -127,6 +218,23 @@ export const getClassroomCourseSummary = async (req, res) => {
         success: false,
         error: 'El bimestre y el período académico son obligatorios'
       });
+    }
+
+    const { id: userId, rol } = req.user;
+
+    if (rol === 'Docente') {
+      const canAccess = await teacherCanAccessClassroomCourse(
+        userId,
+        aulaId,
+        cursoId
+      );
+
+      if (!canAccess) {
+        return res.status(403).json({
+          success: false,
+          error: 'Solo puedes consultar notas de tus cursos asignados'
+        });
+      }
     }
 
     const summary = await getGradesSummaryByClassroomCourse(
@@ -155,6 +263,19 @@ export const getRiskStudents = async (req, res) => {
       });
     }
 
+    const { id: userId, rol } = req.user;
+
+    if (rol === 'Docente') {
+      const canAccess = await teacherCanAccessClassroom(userId, aulaId);
+
+      if (!canAccess) {
+        return res.status(403).json({
+          success: false,
+          error: 'Solo puedes consultar estudiantes de tus aulas asignadas'
+        });
+      }
+    }
+
     const students = await getStudentsAtRisk(
       aulaId,
       bimestre,
@@ -162,6 +283,72 @@ export const getRiskStudents = async (req, res) => {
     );
 
     res.json({ success: true, data: students });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const getMyGrades = async (req, res) => {
+  try {
+    const { id: userId, rol } = req.user;
+    const { periodo_id } = req.query;
+
+    if (rol === 'Estudiante') {
+      const student = await getStudentProfileByUserId(userId);
+
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          error: 'No se encontró el perfil del estudiante'
+        });
+      }
+
+      const grades = await getGradesByStudent(
+        student.estudiante_id,
+        periodo_id || null
+      );
+
+      return res.json({
+        success: true,
+        type: 'student',
+        data: {
+          student,
+          grades
+        }
+      });
+    }
+
+    if (rol === 'Apoderado') {
+      const children = await getGuardianChildrenForGrades(userId);
+
+      const childrenWithGrades = [];
+
+      for (const child of children) {
+        const grades = await getGradesByStudent(
+          child.estudiante_id,
+          periodo_id || null
+        );
+
+        childrenWithGrades.push({
+          student: child,
+          grades
+        });
+      }
+
+      return res.json({
+        success: true,
+        type: 'guardian',
+        data: {
+          children: childrenWithGrades
+        }
+      });
+    }
+
+    return res.status(403).json({
+      success: false,
+      error: 'Este recurso solo está disponible para estudiantes y apoderados'
+    });
 
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

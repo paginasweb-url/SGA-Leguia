@@ -3,7 +3,8 @@ import {
   getCourseById,
   createCourse,
   updateCourse,
-  deleteCourse
+  deleteCourse,
+  getCoursesByStudentUserId
 } from '../services/courses.service.js';
 
 export const getAllCourses = async (req, res) => {
@@ -100,6 +101,25 @@ export const deleteExistingCourse = async (req, res) => {
     });
 
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getMyCourses = async (req, res) => {
+  try {
+    const courses = await getCoursesByStudentUserId(req.user.id);
+
+    res.json({
+      success: true,
+      data: courses
+    });
+
+  } catch (error) {
+    console.error(error);
+
     res.status(500).json({
       success: false,
       error: error.message

@@ -139,6 +139,81 @@ const calculateAnnualStatus = (courses) => {
   };
 };
 
+
+  const buildMeritMetrics = (annualCourses) => {
+    const finalGrades = annualCourses
+      .map((course) => course.nota_final)
+      .filter(Boolean);
+
+    return {
+      total_ad_final: finalGrades.filter((grade) => grade === 'AD').length,
+      total_a_final: finalGrades.filter((grade) => grade === 'A').length,
+      total_b_final: finalGrades.filter((grade) => grade === 'B').length,
+      total_c_final: finalGrades.filter((grade) => grade === 'C').length
+    };
+  };
+
+  const applyMeritRanking = (studentsResults) => {
+    const sorted = [...studentsResults].sort((a, b) => {
+      const pointsDiff =
+        Number(b.summary.puntos_totales || 0) -
+        Number(a.summary.puntos_totales || 0);
+
+      if (pointsDiff !== 0) return pointsDiff;
+
+      const adDiff =
+        Number(b.summary.total_ad_final || 0) -
+        Number(a.summary.total_ad_final || 0);
+
+      if (adDiff !== 0) return adDiff;
+
+      const aDiff =
+        Number(b.summary.total_a_final || 0) -
+        Number(a.summary.total_a_final || 0);
+
+      if (aDiff !== 0) return aDiff;
+
+      const cDiff =
+        Number(a.summary.total_c_final || 0) -
+        Number(b.summary.total_c_final || 0);
+
+      if (cDiff !== 0) return cDiff;
+
+      const lastNameA = `${a.student.apellidos || ''} ${a.student.nombres || ''}`.toLowerCase();
+      const lastNameB = `${b.student.apellidos || ''} ${b.student.nombres || ''}`.toLowerCase();
+
+      return lastNameA.localeCompare(lastNameB);
+    });
+
+    let previousKey = null;
+    let previousRank = 0;
+
+    return sorted.map((item, index) => {
+      const currentKey = [
+        item.summary.puntos_totales,
+        item.summary.total_ad_final,
+        item.summary.total_a_final,
+        item.summary.total_c_final
+      ].join('-');
+
+      const rank = currentKey === previousKey
+        ? previousRank
+        : index + 1;
+
+      previousKey = currentKey;
+      previousRank = rank;
+
+      return {
+        ...item,
+        summary: {
+          ...item.summary,
+          puesto_merito: rank,
+          total_estudiantes_aula: sorted.length
+        }
+      };
+    });
+  };  
+
 export const getStudentEnrollmentForAnnualResult = async (
   studentId,
   periodoId
@@ -283,6 +358,7 @@ export const buildStudentAnnualResult = async (
     (sum, course) => sum + Number(course.puntos_acumulados || 0),
     0
   );
+  const meritMetrics = buildMeritMetrics(annualCourses);
 
   return {
     student,
@@ -293,6 +369,12 @@ export const buildStudentAnnualResult = async (
       cursos_pendientes: annualStatus.cursos_pendientes,
       cursos_con_c: annualStatus.cursos_con_c,
       puntos_totales: totalPoints,
+      total_ad_final: meritMetrics.total_ad_final,
+      total_a_final: meritMetrics.total_a_final,
+      total_b_final: meritMetrics.total_b_final,
+      total_c_final: meritMetrics.total_c_final,
+      puesto_merito: null,
+      total_estudiantes_aula: null,
       estado_anual: annualStatus.estado_anual,
       observacion: annualStatus.observacion
     }
@@ -380,9 +462,11 @@ export const buildClassroomAnnualResults = async (
     }
   }
 
+  const rankedResults = applyMeritRanking(results);
+
   return {
     classroom,
-    students: results
+    students: rankedResults
   };
 };
 
@@ -507,4 +591,70 @@ export const teacherCanAccessAnnualClassroom = async (
   ]);
 
   return result.rows.length > 0;
+};
+
+export const getStudentProfileForAnnualResult = async (userId) => {
+  const query = `
+    SELECT
+      e.id AS estudiante_id,
+      e.codigo_estudiante,
+      u.nombres,
+      u.apellidos,
+      u.dni
+    FROM estudiantes e
+    INNER JOIN users u ON e.user_id = u.id
+    WHERE e.user_id = $1
+    LIMIT 1
+  `;
+
+  const result = await pool.query(query, [userId]);
+  return result.rows[0];
+};
+
+export const getGuardianChildrenForAnnualResult = async (guardianUserId) => {
+  const query = `
+    SELECT
+      ea.parentesco,
+      e.id AS estudiante_id,
+      e.codigo_estudiante,
+      u.nombres,
+      u.apellidos,
+      u.dni
+    FROM apoderados ap
+    INNER JOIN estudiante_apoderado ea
+      ON ea.apoderado_id = ap.id
+    INNER JOIN estudiantes e
+      ON ea.estudiante_id = e.id
+    INNER JOIN users u
+      ON e.user_id = u.id
+    WHERE ap.user_id = $1
+      AND e.estado = 'activo'
+    ORDER BY u.apellidos ASC, u.nombres ASC
+  `;
+
+  const result = await pool.query(query, [guardianUserId]);
+  return result.rows;
+};
+
+export const buildStudentAnnualResultWithRanking = async (
+  studentId,
+  periodoId
+) => {
+  const baseResult = await buildStudentAnnualResult(studentId, periodoId);
+
+  if (!baseResult) {
+    return null;
+  }
+
+  const classroomResults = await buildClassroomAnnualResults(
+    baseResult.student.aula_id,
+    periodoId
+  );
+
+  const rankedStudent = classroomResults?.students?.find(
+    (item) =>
+      Number(item.student.estudiante_id) === Number(studentId)
+  );
+
+  return rankedStudent || baseResult;
 };

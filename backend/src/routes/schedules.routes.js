@@ -7,7 +7,8 @@ import {
   updateExistingSchedule,
   deleteExistingSchedule,
   getClassroomSchedules,
-  getTeacherSchedules
+  getTeacherSchedules,
+  getMySchedules
 } from '../controllers/schedules.controller.js';
 
 import {
@@ -20,8 +21,29 @@ const router = express.Router();
 router.get(
   '/',
   verifyToken,
-  authorizeRoles('Director', 'Administrativo', 'Docente', 'Estudiante', 'Apoderado'),
+  authorizeRoles('Director', 'Administrativo'),
   getAllSchedules
+);
+
+router.get(
+  '/me',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo', 'Docente', 'Estudiante', 'Apoderado'),
+  getMySchedules
+);
+
+router.get(
+  '/classroom/:classroomId',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo', 'Docente'),
+  getClassroomSchedules
+);
+
+router.get(
+  '/teacher/:teacherId',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo', 'Docente'),
+  getTeacherSchedules
 );
 
 router.get(
@@ -50,20 +72,6 @@ router.delete(
   verifyToken,
   authorizeRoles('Director'),
   deleteExistingSchedule
-);
-
-router.get(
-  '/classroom/:classroomId',
-  verifyToken,
-  authorizeRoles('Director', 'Administrativo', 'Docente', 'Estudiante', 'Apoderado'),
-  getClassroomSchedules
-);
-
-router.get(
-  '/teacher/:teacherId',
-  verifyToken,
-  authorizeRoles('Director', 'Administrativo', 'Docente'),
-  getTeacherSchedules
 );
 
 export default router;

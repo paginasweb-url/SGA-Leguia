@@ -97,6 +97,7 @@ export const getRiskStudentsReport = async (bimestre) => {
       e.codigo_estudiante,
       u.nombres,
       u.apellidos,
+      u.dni,
       g.nombre AS grado,
       s.nombre AS seccion,
       a.turno,
@@ -125,14 +126,21 @@ export const getAnnouncementsReport = async () => {
     SELECT
       c.id,
       c.titulo,
+      c.contenido,
       c.destinatario_tipo,
       c.fecha,
-      COUNT(cl.id)::int AS confirmaciones,
-      COUNT(CASE WHEN cl.leido = true THEN 1 END)::int AS leidos
+      COUNT(cl.id)::INT AS confirmaciones,
+      COUNT(cl.id) FILTER (WHERE cl.leido = true)::INT AS leidos
     FROM comunicados c
-    LEFT JOIN comunicado_lecturas cl ON c.id = cl.comunicado_id
-    GROUP BY c.id, c.titulo, c.destinatario_tipo, c.fecha
-    ORDER BY c.fecha DESC
+    LEFT JOIN comunicado_lecturas cl
+      ON cl.comunicado_id = c.id
+    GROUP BY
+      c.id,
+      c.titulo,
+      c.contenido,
+      c.destinatario_tipo,
+      c.fecha
+    ORDER BY c.fecha DESC, c.id DESC
   `;
 
   const result = await pool.query(query);

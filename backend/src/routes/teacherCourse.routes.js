@@ -5,7 +5,9 @@ import {
   createNewTeacherCourse,
   getAssignmentsByTeacher,
   getAssignmentsByClassroom,
-  deleteExistingTeacherCourse
+  deleteExistingTeacherCourse,
+  getMyTeacherCourses,
+  getMyTeacherStudents
 } from '../controllers/teacherCourse.controller.js';
 
 import {
@@ -18,8 +20,22 @@ const router = express.Router();
 router.get(
   '/',
   verifyToken,
-  authorizeRoles('Director', 'Administrativo', 'Docente'),
+  authorizeRoles('Director', 'Administrativo'),
   getAllTeacherCourses
+);
+
+router.get(
+  '/me',
+  verifyToken,
+  authorizeRoles('Docente'),
+  getMyTeacherCourses
+);
+
+router.get(
+  '/me/students',
+  verifyToken,
+  authorizeRoles('Docente'),
+  getMyTeacherStudents
 );
 
 router.post(
@@ -32,7 +48,7 @@ router.post(
 router.get(
   '/teacher/:teacherId',
   verifyToken,
-  authorizeRoles('Director', 'Administrativo', 'Docente'),
+  authorizeRoles('Director', 'Administrativo'),
   getAssignmentsByTeacher
 );
 

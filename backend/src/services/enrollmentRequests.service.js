@@ -19,7 +19,6 @@ export const createEnrollmentRequest = async (data) => {
     apoderado_direccion,
     parentesco,
     grado_id,
-    seccion_id,
     turno,
     periodo_id
   } = data;
@@ -29,34 +28,56 @@ export const createEnrollmentRequest = async (data) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Insertamos todos los datos de la solicitud usando el pool del cliente en la transacción
     const insertResult = await client.query(`
       INSERT INTO solicitudes_matricula (
-        estudiante_dni, estudiante_nombres, estudiante_apellidos, estudiante_fecha_nacimiento, estudiante_direccion,
-        apoderado_dni, apoderado_nombres, apoderado_apellidos, apoderado_telefono, apoderado_direccion,
-        parentesco, grado_id, seccion_id, turno, periodo_id,
-        estado, created_at, updated_at
+        estudiante_dni,
+        estudiante_nombres,
+        estudiante_apellidos,
+        estudiante_fecha_nacimiento,
+        estudiante_direccion,
+        apoderado_dni,
+        apoderado_nombres,
+        apoderado_apellidos,
+        apoderado_telefono,
+        apoderado_direccion,
+        parentesco,
+        grado_id,
+        seccion_id,
+        turno,
+        periodo_id,
+        estado,
+        created_at,
+        updated_at
       )
       VALUES (
         $1, $2, $3, $4, $5,
         $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15,
+        $11, $12, NULL, $13, $14,
         'pendiente', NOW(), NOW()
       )
       RETURNING *;
     `, [
-      estudiante_dni, estudiante_nombres, estudiante_apellidos, estudiante_fecha_nacimiento, estudiante_direccion,
-      apoderado_dni, apoderado_nombres, apoderado_apellidos, apoderado_telefono, apoderado_direccion,
-      parentesco, grado_id, seccion_id, turno, periodo_id
+      estudiante_dni,
+      estudiante_nombres,
+      estudiante_apellidos,
+      estudiante_fecha_nacimiento,
+      estudiante_direccion,
+      apoderado_dni,
+      apoderado_nombres,
+      apoderado_apellidos,
+      apoderado_telefono,
+      apoderado_direccion,
+      parentesco,
+      grado_id,
+      turno,
+      periodo_id
     ]);
 
     const nuevaSolicitud = insertResult.rows[0];
-    
-    // 2. Generamos el código a partir del ID secuencial único devuelto por PostgreSQL
+
     const year = new Date(nuevaSolicitud.created_at).getFullYear();
     const codigoSeguimiento = `SOL-${year}-${String(nuevaSolicitud.id).padStart(6, '0')}`;
 
-    // 3. Actualizamos la misma fila con el código generado
     const updateResult = await client.query(`
       UPDATE solicitudes_matricula
       SET codigo_seguimiento = $1
@@ -71,6 +92,7 @@ export const createEnrollmentRequest = async (data) => {
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
+
   } finally {
     client.release();
   }
@@ -86,11 +108,16 @@ export const trackEnrollmentRequest = async ({
       sm.*,
       g.nombre AS grado,
       s.nombre AS seccion,
-      p.nombre AS periodo
+      p.nombre AS periodo,
+      aa.id AS aula_asignada_id,
+      sa.nombre AS seccion_asignada,
+      aa.turno AS turno_asignado
     FROM solicitudes_matricula sm
     LEFT JOIN grados g ON sm.grado_id = g.id
     LEFT JOIN secciones s ON sm.seccion_id = s.id
     LEFT JOIN periodos_academicos p ON sm.periodo_id = p.id
+    LEFT JOIN aulas aa ON sm.aula_id_asignada = aa.id
+    LEFT JOIN secciones sa ON aa.seccion_id = sa.id
     WHERE sm.codigo_seguimiento = $1
       AND sm.estudiante_dni = $2
       AND sm.apoderado_dni = $3
@@ -137,11 +164,17 @@ export const getEnrollmentRequests = async () => {
       sm.*,
       g.nombre AS grado,
       s.nombre AS seccion,
-      p.nombre AS periodo
+      p.nombre AS periodo,
+      aa.id AS aula_asignada_id,
+      sa.nombre AS seccion_asignada,
+      aa.turno AS turno_asignado,
+      aa.capacidad AS aula_capacidad
     FROM solicitudes_matricula sm
     LEFT JOIN grados g ON sm.grado_id = g.id
     LEFT JOIN secciones s ON sm.seccion_id = s.id
     LEFT JOIN periodos_academicos p ON sm.periodo_id = p.id
+    LEFT JOIN aulas aa ON sm.aula_id_asignada = aa.id
+    LEFT JOIN secciones sa ON aa.seccion_id = sa.id
     ORDER BY sm.created_at DESC
   `;
 
@@ -152,9 +185,22 @@ export const getEnrollmentRequests = async () => {
 
 export const getEnrollmentRequestById = async (id) => {
   const query = `
-    SELECT *
-    FROM solicitudes_matricula
-    WHERE id = $1
+    SELECT
+      sm.*,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      p.nombre AS periodo,
+      aa.id AS aula_asignada_id,
+      sa.nombre AS seccion_asignada,
+      aa.turno AS turno_asignado,
+      aa.capacidad AS aula_capacidad
+    FROM solicitudes_matricula sm
+    LEFT JOIN grados g ON sm.grado_id = g.id
+    LEFT JOIN secciones s ON sm.seccion_id = s.id
+    LEFT JOIN periodos_academicos p ON sm.periodo_id = p.id
+    LEFT JOIN aulas aa ON sm.aula_id_asignada = aa.id
+    LEFT JOIN secciones sa ON aa.seccion_id = sa.id
+    WHERE sm.id = $1
   `;
 
   const result = await pool.query(query, [id]);
@@ -242,7 +288,7 @@ export const updateEnrollmentRequestStatus = async (
   return result.rows[0];
 };
 
-export const approveEnrollmentRequest = async (requestId) => {
+export const approveEnrollmentRequest = async (requestId, aulaIdAsignada) => {
   const client = await pool.connect();
 
   try {
@@ -267,27 +313,66 @@ export const approveEnrollmentRequest = async (requestId) => {
       throw new Error('La solicitud ya fue aprobada anteriormente');
     }
 
-    const classroomResult = await client.query(
-      `
-      SELECT id
-      FROM aulas
-      WHERE grado_id = $1
-        AND seccion_id = $2
-        AND turno = $3
-      LIMIT 1
-      `,
-      [
-        request.grado_id,
-        request.seccion_id,
-        request.turno
-      ]
+    if (!aulaIdAsignada) {
+  throw new Error('Debe seleccionar un aula para aprobar la solicitud');
+}
+
+const classroomResult = await client.query(
+    `
+    SELECT
+      a.id,
+      a.grado_id,
+      a.seccion_id,
+      a.turno,
+      a.capacidad,
+      g.nombre AS grado,
+      s.nombre AS seccion
+    FROM aulas a
+    INNER JOIN grados g ON a.grado_id = g.id
+    INNER JOIN secciones s ON a.seccion_id = s.id
+    WHERE a.id = $1
+    LIMIT 1
+    `,
+    [aulaIdAsignada]
+  );
+
+  if (classroomResult.rows.length === 0) {
+    throw new Error('El aula seleccionada no existe');
+  }
+
+  const classroom = classroomResult.rows[0];
+
+  if (Number(classroom.grado_id) !== Number(request.grado_id)) {
+    throw new Error('El aula seleccionada no corresponde al grado solicitado');
+  }
+
+  if (classroom.turno !== request.turno) {
+    throw new Error('El aula seleccionada no corresponde al turno solicitado');
+  }
+
+  const capacityResult = await client.query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM matriculas
+    WHERE aula_id = $1
+      AND periodo_id = $2
+      AND estado = 'aprobado'
+    `,
+    [
+      classroom.id,
+      request.periodo_id
+    ]
+  );
+
+  const totalMatriculados = capacityResult.rows[0].total;
+
+  if (totalMatriculados >= classroom.capacidad) {
+    throw new Error(
+      `El aula seleccionada no tiene vacantes disponibles. Capacidad: ${classroom.capacidad}`
     );
+  }
 
-    if (classroomResult.rows.length === 0) {
-      throw new Error('No existe un aula registrada para el grado, sección y turno solicitados');
-    }
-
-    const aulaId = classroomResult.rows[0].id;
+  const aulaId = classroom.id;
 
     const studentCredentials = generateCredentials(
       'Estudiante',
@@ -575,6 +660,8 @@ export const approveEnrollmentRequest = async (requestId) => {
       UPDATE solicitudes_matricula
       SET
         estado = 'aprobado',
+        seccion_id = $3,
+        aula_id_asignada = $4,
         observacion = 'Solicitud aprobada y matrícula generada automáticamente',
         credenciales_generadas = $2,
         updated_at = NOW()
@@ -583,7 +670,9 @@ export const approveEnrollmentRequest = async (requestId) => {
       `,
       [
         requestId,
-        credentialsPayload
+        credentialsPayload,
+        classroom.seccion_id,
+        aulaId
       ]
     );
 
@@ -604,4 +693,126 @@ export const approveEnrollmentRequest = async (requestId) => {
   } finally {
     client.release();
   }
+};
+
+export const getEnrollmentPublicOptions = async () => {
+  const gradesResult = await pool.query(`
+    SELECT DISTINCT
+      g.id,
+      g.nombre
+    FROM aulas a
+    INNER JOIN grados g ON a.grado_id = g.id
+    ORDER BY g.id ASC
+  `);
+
+  const turnsResult = await pool.query(`
+    SELECT DISTINCT turno
+    FROM aulas
+    ORDER BY turno ASC
+  `);
+
+  const periodsResult = await pool.query(`
+    SELECT
+      id,
+      nombre
+    FROM periodos_academicos
+    ORDER BY id DESC
+  `);
+
+  return {
+    grados: gradesResult.rows,
+    turnos: turnsResult.rows.map((item) => item.turno),
+    periodos: periodsResult.rows
+  };
+};
+
+export const getAvailableClassroomsForEnrollment = async ({
+  grado_id,
+  turno,
+  periodo_id
+}) => {
+  const query = `
+    SELECT
+      a.id AS aula_id,
+      a.grado_id,
+      g.nombre AS grado,
+      a.seccion_id,
+      s.nombre AS seccion,
+      a.turno,
+      a.capacidad,
+      COUNT(m.id)::int AS matriculados,
+      (a.capacidad - COUNT(m.id))::int AS vacantes
+    FROM aulas a
+    INNER JOIN grados g ON a.grado_id = g.id
+    INNER JOIN secciones s ON a.seccion_id = s.id
+    LEFT JOIN matriculas m
+      ON m.aula_id = a.id
+      AND m.periodo_id = $3
+      AND m.estado = 'aprobado'
+    WHERE a.grado_id = $1
+      AND a.turno = $2
+      AND a.estado = 'activo'
+    GROUP BY
+      a.id,
+      a.grado_id,
+      g.nombre,
+      a.seccion_id,
+      s.nombre,
+      a.turno,
+      a.capacidad
+    ORDER BY s.nombre ASC
+  `;
+
+  const result = await pool.query(query, [
+    grado_id,
+    turno,
+    periodo_id
+  ]);
+
+  return result.rows;
+};
+
+export const downloadEnrollmentDocument = async (requestId, documentId) => {
+  const documentResult = await pool.query(
+    `
+    SELECT
+      id,
+      solicitud_id,
+      tipo_documento,
+      nombre_archivo,
+      storage_path
+    FROM documentos_solicitud_matricula
+    WHERE id = $1
+      AND solicitud_id = $2
+    LIMIT 1
+    `,
+    [documentId, requestId]
+  );
+
+  if (documentResult.rows.length === 0) {
+    throw new Error('Documento no encontrado para esta solicitud');
+  }
+
+  const document = documentResult.rows[0];
+
+  if (!document.storage_path) {
+    throw new Error('El documento no tiene una ruta de almacenamiento válida');
+  }
+
+  const { data, error } = await supabase.storage
+    .from(process.env.SUPABASE_BUCKET)
+    .download(document.storage_path);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const arrayBuffer = await data.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  return {
+    buffer,
+    fileName: document.nombre_archivo || `documento-${document.id}`,
+    contentType: data.type || 'application/octet-stream'
+  };
 };

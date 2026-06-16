@@ -76,46 +76,10 @@ export const getGuardian = async (req, res) => {
 };
 
 export const createNewGuardian = async (req, res) => {
-  try {
-    const { password_hash, dni } = req.body;
-
-    if (!dni) {
-      return res.status(400).json({
-        success: false,
-        error: 'El DNI es obligatorio'
-      });
-    }
-
-    if (!password_hash) {
-      return res.status(400).json({
-        success: false,
-        error: 'La contraseña inicial es obligatoria'
-      });
-    }
-
-    const credentials = generateCredentials('Apoderado', dni);
-    const hashedPassword = await bcrypt.hash(password_hash, 10);
-
-    const guardianData = {
-      id: uuidv4(),
-      rol_id: 6,
-      ...req.body,
-      username: credentials.username,
-      correo: credentials.correo,
-      password_hash: hashedPassword
-    };
-
-    const guardian = await createGuardian(guardianData);
-
-    res.status(201).json({
-      success: true,
-      data: guardian
-    });
-
-  } catch (error) {
-    console.error(error);
-    handleDuplicateError(error, res);
-  }
+  return res.status(403).json({
+    success: false,
+    error: 'Los apoderados se crean únicamente mediante una matrícula aprobada'
+  });
 };
 
 export const updateExistingGuardian = async (req, res) => {

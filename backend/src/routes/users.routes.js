@@ -8,7 +8,10 @@ import {
   deactivateExistingUser
 } from '../controllers/users.controller.js';
 
-import { verifyToken, authorizeRoles} from '../middlewares/auth.middleware.js';
+import {
+  verifyToken,
+  authorizeRoles
+} from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
@@ -29,7 +32,7 @@ router.get(
 router.post(
   '/',
   verifyToken,
-  authorizeRoles('Director', 'Administrativo'),
+  authorizeRoles('Director'),
   createNewUser
 );
 
@@ -41,8 +44,8 @@ router.put(
 );
 
 router.patch(
-  '/:id/deactivate', 
-  verifyToken, 
+  '/:id/deactivate',
+  verifyToken,
   authorizeRoles('Director', 'Administrativo'),
   deactivateExistingUser
 );

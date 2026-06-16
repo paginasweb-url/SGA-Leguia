@@ -4,7 +4,8 @@ import {
   getAnnouncementById,
   getAnnouncementsForUser,
   confirmAnnouncementRead,
-  getAnnouncementReadSummary
+  getAnnouncementReadSummary,
+  validateAnnouncementTargetAccess
 } from '../services/announcements.service.js';
 
 export const createNewAnnouncement = async (req, res) => {
@@ -17,6 +18,20 @@ export const createNewAnnouncement = async (req, res) => {
         error: 'Título y contenido son obligatorios'
       });
     }
+
+      const validation = await validateAnnouncementTargetAccess({
+        userId: req.user.id,
+        rol: req.user.rol,
+        destinatario_tipo: destinatario_tipo || 'general',
+        aula_id
+      });
+
+      if (!validation.allowed) {
+        return res.status(403).json({
+          success: false,
+          error: validation.error
+        });
+      }
 
     const announcement = await createAnnouncement({
       titulo,

@@ -6,7 +6,10 @@ import {
   getDocumentsByEnrollmentRequest,
   updateEnrollmentRequestStatus,
   approveEnrollmentRequest,
-  trackEnrollmentRequest
+  trackEnrollmentRequest,
+  getEnrollmentPublicOptions,
+  getAvailableClassroomsForEnrollment,
+  downloadEnrollmentDocument
 } from '../services/enrollmentRequests.service.js';
 
 export const createNewEnrollmentRequest = async (req, res) => {
@@ -15,24 +18,38 @@ export const createNewEnrollmentRequest = async (req, res) => {
       estudiante_dni,
       estudiante_nombres,
       estudiante_apellidos,
+      estudiante_fecha_nacimiento,
+      estudiante_direccion,
       apoderado_dni,
       apoderado_nombres,
       apoderado_apellidos,
-      parentesco
+      apoderado_telefono,
+      apoderado_direccion,
+      parentesco,
+      grado_id,
+      turno,
+      periodo_id
     } = req.body;
 
     if (
       !estudiante_dni ||
       !estudiante_nombres ||
       !estudiante_apellidos ||
+      !estudiante_fecha_nacimiento ||
+      !estudiante_direccion ||
       !apoderado_dni ||
       !apoderado_nombres ||
       !apoderado_apellidos ||
-      !parentesco
+      !apoderado_telefono ||
+      !apoderado_direccion ||
+      !parentesco ||
+      !grado_id ||
+      !turno ||
+      !periodo_id
     ) {
       return res.status(400).json({
         success: false,
-        error: 'Faltan datos obligatorios de estudiante o apoderado'
+        error: 'Faltan datos obligatorios de estudiante, apoderado o matrícula'
       });
     }
 
@@ -221,7 +238,9 @@ export const updateRequestStatus = async (req, res) => {
     }
 
     if (estado === 'aprobado') {
-      const result = await approveEnrollmentRequest(id);
+      const { aula_id } = req.body;
+
+      const result = await approveEnrollmentRequest(id, aula_id);
 
       return res.json({
         success: true,
@@ -241,6 +260,85 @@ export const updateRequestStatus = async (req, res) => {
       message: 'Estado actualizado correctamente',
       data: request
     });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getPublicEnrollmentOptions = async (req, res) => {
+  try {
+    const options = await getEnrollmentPublicOptions();
+
+    res.json({
+      success: true,
+      data: options
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getAvailableClassrooms = async (req, res) => {
+  try {
+    const {
+      grado_id,
+      turno,
+      periodo_id
+    } = req.query;
+
+    if (!grado_id || !turno || !periodo_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Grado, turno y período académico son obligatorios'
+      });
+    }
+
+    const classrooms = await getAvailableClassroomsForEnrollment({
+      grado_id,
+      turno,
+      periodo_id
+    });
+
+    res.json({
+      success: true,
+      data: classrooms
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const downloadDocumentFromEnrollmentRequest = async (req, res) => {
+  try {
+    const { id, documentId } = req.params;
+    const { mode } = req.query;
+
+    const file = await downloadEnrollmentDocument(id, documentId);
+
+    const dispositionType = mode === 'download' ? 'attachment' : 'inline';
+
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `${dispositionType}; filename="${encodeURIComponent(file.fileName)}"`
+    );
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    res.send(file.buffer);
 
   } catch (error) {
     console.error(error);
