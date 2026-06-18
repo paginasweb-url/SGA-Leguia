@@ -140,6 +140,86 @@ export const getAttendanceByClassroomAndDate = async (aulaId, fecha) => {
   return result.rows;
 };
 
+export const getAttendanceByClassroomRange = async ({
+  aulaId,
+  fechaInicio,
+  fechaFin
+}) => {
+  const recordsQuery = `
+    SELECT
+      a.id,
+      a.fecha,
+      a.estado,
+      a.observacion,
+      e.id AS estudiante_id,
+      e.codigo_estudiante,
+      u.nombres,
+      u.apellidos,
+      u.dni,
+      au.id AS aula_id,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      au.turno
+    FROM asistencias a
+    INNER JOIN estudiantes e
+      ON a.estudiante_id = e.id
+    INNER JOIN users u
+      ON e.user_id = u.id
+    INNER JOIN aulas au
+      ON a.aula_id = au.id
+    INNER JOIN grados g
+      ON au.grado_id = g.id
+    INNER JOIN secciones s
+      ON au.seccion_id = s.id
+    WHERE a.aula_id = $1
+      AND a.fecha BETWEEN $2 AND $3
+    ORDER BY a.fecha DESC, u.apellidos ASC, u.nombres ASC
+  `;
+
+  const summaryQuery = `
+    SELECT
+      e.id AS estudiante_id,
+      e.codigo_estudiante,
+      u.nombres,
+      u.apellidos,
+      u.dni,
+      COUNT(a.id)::int AS total,
+      (COUNT(a.id) FILTER (WHERE a.estado = 'presente'))::int AS presente,
+      (COUNT(a.id) FILTER (WHERE a.estado = 'tarde'))::int AS tarde,
+      (COUNT(a.id) FILTER (WHERE a.estado = 'falta'))::int AS falta,
+      (COUNT(a.id) FILTER (WHERE a.estado = 'justificado'))::int AS justificado
+    FROM matriculas m
+    INNER JOIN estudiantes e
+      ON m.estudiante_id = e.id
+    INNER JOIN users u
+      ON e.user_id = u.id
+    LEFT JOIN asistencias a
+      ON a.estudiante_id = e.id
+      AND a.aula_id = m.aula_id
+      AND a.fecha BETWEEN $2 AND $3
+    WHERE m.aula_id = $1
+      AND m.estado = 'aprobado'
+      AND e.estado = 'activo'
+    GROUP BY
+      e.id,
+      e.codigo_estudiante,
+      u.nombres,
+      u.apellidos,
+      u.dni
+    ORDER BY u.apellidos ASC, u.nombres ASC
+  `;
+
+  const [recordsResult, summaryResult] = await Promise.all([
+    pool.query(recordsQuery, [aulaId, fechaInicio, fechaFin]),
+    pool.query(summaryQuery, [aulaId, fechaInicio, fechaFin])
+  ]);
+
+  return {
+    records: recordsResult.rows,
+    summary: summaryResult.rows
+  };
+};
+
 export const getAttendanceByStudent = async (studentId) => {
   const query = `
     SELECT
@@ -237,8 +317,35 @@ export const getActiveClassroomsForAttendance = async () => {
   return result.rows;
 };
 
-export const getAttendanceForUser = async ({ userId, rol }) => {
+export const getAttendanceForUser = async ({
+  userId,
+  rol,
+  fechaInicio,
+  fechaFin
+}) => {
+
+    const buildDateFilter = (values) => {
+    if (fechaInicio && fechaFin) {
+      values.push(fechaInicio, fechaFin);
+      return `AND a.fecha BETWEEN $${values.length - 1} AND $${values.length}`;
+    }
+
+    if (fechaInicio) {
+      values.push(fechaInicio);
+      return `AND a.fecha >= $${values.length}`;
+    }
+
+    if (fechaFin) {
+      values.push(fechaFin);
+      return `AND a.fecha <= $${values.length}`;
+    }
+
+    return '';
+  };
+
   if (rol === 'Estudiante') {
+    const values = [userId];
+    const dateFilter = buildDateFilter(values);
     const query = `
       SELECT
         e.id AS estudiante_id,
@@ -258,14 +365,17 @@ export const getAttendanceForUser = async ({ userId, rol }) => {
       LEFT JOIN grados g ON au.grado_id = g.id
       LEFT JOIN secciones s ON au.seccion_id = s.id
       WHERE e.user_id = $1
+      ${dateFilter}
       ORDER BY a.fecha DESC
     `;
 
-    const result = await pool.query(query, [userId]);
+    const result = await pool.query(query, values);
     return result.rows;
   }
 
   if (rol === 'Apoderado') {
+    const values = [userId];
+    const dateFilter = buildDateFilter(values);
     const query = `
       SELECT
         e.id AS estudiante_id,
@@ -288,14 +398,17 @@ export const getAttendanceForUser = async ({ userId, rol }) => {
       LEFT JOIN grados g ON au.grado_id = g.id
       LEFT JOIN secciones s ON au.seccion_id = s.id
       WHERE ap.user_id = $1
+      ${dateFilter}
       ORDER BY ue.apellidos ASC, ue.nombres ASC, a.fecha DESC
     `;
 
-    const result = await pool.query(query, [userId]);
+    const result = await pool.query(query, values);
     return result.rows;
   }
 
   if (rol === 'Docente') {
+    const values = [userId];
+    const dateFilter = buildDateFilter(values);
     const query = `
       SELECT
         a.id,
@@ -326,10 +439,11 @@ export const getAttendanceForUser = async ({ userId, rol }) => {
         ON a.estudiante_id = e.id
         AND a.aula_id = au.id
       WHERE d.user_id = $1
+      ${dateFilter}
       ORDER BY a.fecha DESC, ue.apellidos ASC, ue.nombres ASC
     `;
 
-    const result = await pool.query(query, [userId]);
+    const result = await pool.query(query, values);
     return result.rows;
   }
 

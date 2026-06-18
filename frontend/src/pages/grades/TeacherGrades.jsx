@@ -12,6 +12,8 @@ import {
   Users
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 import {
   BIMESTERS,
   GRADE_SCALE,
@@ -104,6 +106,20 @@ function TeacherGrades() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
   const classrooms = useMemo(() => {
     const map = new Map();
@@ -387,20 +403,6 @@ function TeacherGrades() {
           </button>
         </div>
       </section>
-
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">{error}</p>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="bg-green-50 border border-green-100 text-green-700 rounded-2xl p-4 flex gap-3">
-          <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">{successMessage}</p>
-        </div>
-      )}
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <CounterCard icon={Users} label="Estudiantes" value={counters.total} description="Matriculados en el aula" />

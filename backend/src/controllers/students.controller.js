@@ -1,5 +1,6 @@
 import {
   getStudents,
+  getStudentsForAuxiliary,
   createStudent,
   getStudentById,
   updateStudent,
@@ -118,6 +119,25 @@ export const deactivateExistingStudent = async (req, res) => {
     });
 
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getAuxiliaryStudents = async (req, res) => {
+  try {
+    const students = await getStudentsForAuxiliary(req.query);
+
+    res.json({
+      success: true,
+      data: students
+    });
+
+  } catch (error) {
+    console.error(error);
+
     res.status(500).json({
       success: false,
       error: error.message

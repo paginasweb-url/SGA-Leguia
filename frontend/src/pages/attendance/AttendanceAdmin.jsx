@@ -16,9 +16,12 @@ import {
   XCircle
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 import {
   getAttendanceClassrooms,
   getClassroomAttendanceByDate,
+  getClassroomAttendanceByRange,
   getClassroomStudentsForAttendance,
   registerClassroomAttendance
 } from '../../services/attendance.service';
@@ -63,9 +66,18 @@ function AttendanceAdmin() {
   const [selectedClassroomId, setSelectedClassroomId] = useState('');
   const [selectedDate, setSelectedDate] = useState(getToday());
 
+  const [attendanceMode, setAttendanceMode] = useState('day');
+  const [dateFrom, setDateFrom] = useState(getToday());
+  const [dateTo, setDateTo] = useState(getToday());
+  const [rangeRecords, setRangeRecords] = useState([]);
+  const [rangeSummary, setRangeSummary] = useState([]);
+  const [selectedRangeRecord, setSelectedRangeRecord] = useState(null);
+
   const today = getToday();
+  const isDayMode = attendanceMode === 'day';
+  const isRangeMode = attendanceMode === 'range';
   const isTodaySelected = selectedDate === today;
-  const canEditAttendance = canRegister && isTodaySelected;
+  const canEditAttendance = canRegister && isDayMode && isTodaySelected;
 
   const [attendanceForm, setAttendanceForm] = useState({});
   const [studentSearch, setStudentSearch] = useState('');
@@ -114,12 +126,37 @@ function AttendanceAdmin() {
   };
 
   const loadClassroomDetail = async () => {
-    if (!selectedClassroomId || !selectedDate) return;
+    if (!selectedClassroomId) return;
 
     try {
       setError('');
       setSuccessMessage('');
       setLoadingDetail(true);
+
+      if (isRangeMode) {
+        if (!dateFrom || !dateTo) return;
+
+        if (dateFrom > dateTo) {
+          setError('La fecha de inicio no puede ser mayor que la fecha fin.');
+          return;
+        }
+
+        const response = await getClassroomAttendanceByRange({
+          aulaId: selectedClassroomId,
+          fechaInicio: dateFrom,
+          fechaFin: dateTo
+        });
+
+        setRangeRecords(response.data || []);
+        setRangeSummary(response.summary || []);
+        setStudents([]);
+        setRegisteredAttendance([]);
+        setAttendanceForm({});
+
+        return;
+      }
+
+      if (!selectedDate) return;
 
       const [studentsResponse, attendanceResponse] = await Promise.all([
         getClassroomStudentsForAttendance(selectedClassroomId),
@@ -134,6 +171,8 @@ function AttendanceAdmin() {
 
       setStudents(studentsData);
       setRegisteredAttendance(attendanceData);
+      setRangeRecords([]);
+      setRangeSummary([]);
 
       const registeredMap = new Map(
         attendanceData.map((item) => [Number(item.estudiante_id), item])
@@ -167,7 +206,21 @@ function AttendanceAdmin() {
 
   useEffect(() => {
     loadClassroomDetail();
-  }, [selectedClassroomId, selectedDate]);
+  }, [selectedClassroomId, selectedDate, attendanceMode, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
   const filteredStudents = useMemo(() => {
     const term = studentSearch.trim().toLowerCase();
@@ -206,6 +259,29 @@ function AttendanceAdmin() {
       }
     );
   }, [students, attendanceForm]);
+
+  const rangeCounters = useMemo(() => {
+  return rangeSummary.reduce(
+    (acc, item) => {
+      acc.total += Number(item.total || 0);
+      acc.presente += Number(item.presente || 0);
+      acc.tarde += Number(item.tarde || 0);
+      acc.falta += Number(item.falta || 0);
+      acc.justificado += Number(item.justificado || 0);
+      return acc;
+    },
+    {
+      total: 0,
+      presente: 0,
+      tarde: 0,
+      falta: 0,
+      justificado: 0
+    }
+  );
+}, [rangeSummary]);
+
+const displayedSummary = isRangeMode ? rangeCounters : summary;
+const displayedStudentCount = isRangeMode ? rangeSummary.length : students.length;
 
   const handleAttendanceChange = (studentId, field, value) => {
     setAttendanceForm((prev) => ({
@@ -347,20 +423,12 @@ function AttendanceAdmin() {
         </div>
       </section>
 
-      {error && (
-        <MessageBox type="error" message={error} onClose={() => setError('')} />
-      )}
-
-      {successMessage && (
-        <MessageBox type="success" message={successMessage} onClose={() => setSuccessMessage('')} />
-      )}
-
       <section className="grid grid-cols-1 md:grid-cols-5 gap-5">
-        <CounterCard icon={Users} label="Estudiantes" value={students.length} description="En aula seleccionada" />
-        <CounterCard icon={CheckCircle2} label="Presentes" value={summary.presente} description="Asistencia registrada" />
-        <CounterCard icon={Clock3} label="Tardes" value={summary.tarde} description="Llegadas tarde" />
-        <CounterCard icon={XCircle} label="Faltas" value={summary.falta} description="No asistieron" />
-        <CounterCard icon={FileCheck2} label="Justificados" value={summary.justificado} description="Con observación" />
+        <CounterCard icon={Users} label="Estudiantes" value={displayedStudentCount} description="En aula seleccionada" />
+        <CounterCard icon={CheckCircle2} label="Presentes" value={displayedSummary.presente} description="Asistencia registrada" />
+        <CounterCard icon={Clock3} label="Tardes" value={displayedSummary.tarde} description="Llegadas tarde" />
+        <CounterCard icon={XCircle} label="Faltas" value={displayedSummary.falta} description="No asistieron" />
+        <CounterCard icon={FileCheck2} label="Justificados" value={displayedSummary.justificado} description="Con observación" />
       </section>
 
       <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5">
@@ -368,7 +436,7 @@ function AttendanceAdmin() {
           <select
             value={selectedClassroomId}
             onChange={(e) => setSelectedClassroomId(e.target.value)}
-            className="lg:col-span-5 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+            className={`${isRangeMode ? 'lg:col-span-3' : 'lg:col-span-4'} px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800`}
           >
             <option value="">Selecciona un aula</option>
             {classrooms.map((classroom) => (
@@ -378,15 +446,44 @@ function AttendanceAdmin() {
             ))}
           </select>
 
-          <input
-            type="date"
-            value={selectedDate}
-            max={today}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="lg:col-span-3 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-          />
+          <select
+            value={attendanceMode}
+            onChange={(e) => setAttendanceMode(e.target.value)}
+            className="lg:col-span-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+          >
+            <option value="day">Día exacto</option>
+            <option value="range">Rango de fechas</option>
+          </select>
 
-          <div className="relative lg:col-span-4">
+          {isDayMode ? (
+            <input
+              type="date"
+              value={selectedDate}
+              max={today}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="lg:col-span-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+            />
+          ) : (
+            <>
+              <input
+                type="date"
+                value={dateFrom}
+                max={today}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="lg:col-span-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+              />
+
+              <input
+                type="date"
+                value={dateTo}
+                max={today}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="lg:col-span-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+              />
+            </>
+          )}
+
+          <div className={`relative ${isRangeMode ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
             <Search size={18} className="absolute left-3 top-3.5 text-slate-400" />
 
             <input
@@ -398,7 +495,7 @@ function AttendanceAdmin() {
           </div>
         </div>
       </section>
-      {canRegister && !isTodaySelected && (
+      {canRegister && isDayMode && !isTodaySelected && (
           <div className="bg-yellow-50 border border-yellow-100 text-warning rounded-2xl p-4 flex gap-3">
             <AlertCircle size={20} className="shrink-0 mt-0.5" />
 
@@ -406,7 +503,17 @@ function AttendanceAdmin() {
               La fecha seleccionada corresponde a un día pasado. Solo puedes consultar la asistencia registrada; no se permite modificarla.
             </p>
           </div>
-        )}     
+        )}
+
+      {isRangeMode && (
+        <div className="bg-blue-50 border border-blue-100 text-blue-700 rounded-2xl p-4 flex gap-3">
+          <CalendarDays size={20} className="shrink-0 mt-0.5" />
+
+          <p className="text-sm font-semibold">
+            El rango de fechas es solo para consulta. Para registrar o modificar asistencia usa el modo Día exacto.
+          </p>
+        </div>
+      )}     
 
       {selectedClassroom && (
         <section className="bg-brand-950 text-white rounded-3xl shadow-soft p-6">
@@ -421,11 +528,13 @@ function AttendanceAdmin() {
               </h2>
 
               <p className="text-sm text-blue-100 mt-1">
-                Fecha: {formatDate(selectedDate)} · Registros guardados: {registeredAttendance.length}
+                {isRangeMode
+                ? `Rango: ${formatDate(dateFrom)} hasta ${formatDate(dateTo)} · Registros encontrados: ${rangeRecords.length}`
+                : `Fecha: ${formatDate(selectedDate)} · Registros guardados: ${registeredAttendance.length}`}
               </p>
             </div>
 
-            {canRegister && (
+            {canRegister && isDayMode && (
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
@@ -460,16 +569,18 @@ function AttendanceAdmin() {
         <div className="p-6 border-b border-slate-100 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-xl font-extrabold text-brand-950">
-              Estudiantes del aula
+              {isRangeMode ? 'Resumen del rango' : 'Estudiantes del aula'}
             </h2>
 
             <p className="text-sm text-slate-500 mt-1">
-              Estados permitidos: presente, tarde, falta y justificado.
+              {isRangeMode
+                ? 'Consulta acumulada de asistencia por estudiante.'
+                : 'Estados permitidos: presente, tarde, falta y justificado.'}
             </p>
           </div>
 
           <span className="hidden sm:inline-flex rounded-full px-3 py-1 text-xs font-extrabold bg-brand-50 text-brand-900 border border-brand-100">
-            {filteredStudents.length} resultado(s)
+            {isRangeMode ? rangeSummary.length : filteredStudents.length} resultado(s)
           </span>
         </div>
 
@@ -477,9 +588,16 @@ function AttendanceAdmin() {
           <div className="p-10 text-center">
             <Loader2 className="mx-auto animate-spin text-brand-900" size={34} />
             <p className="text-sm text-slate-500 mt-3 font-semibold">
-              Cargando estudiantes...
+              Cargando asistencia...
             </p>
           </div>
+        ) : isRangeMode ? (
+          <RangeAttendanceView
+            summary={rangeSummary}
+            records={rangeRecords}
+            search={studentSearch}
+            onOpenRecord={setSelectedRangeRecord}
+          />
         ) : filteredStudents.length > 0 ? (
           <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[380px] overflow-y-auto">
             {filteredStudents.map((student) => (
@@ -498,7 +616,210 @@ function AttendanceAdmin() {
           <EmptyBlock text="No se encontraron estudiantes para esta aula." />
         )}
       </section>
+
+      {selectedRangeRecord && (
+        <AttendanceRecordModal
+          item={selectedRangeRecord}
+          onClose={() => setSelectedRangeRecord(null)}
+        />
+      )}
     </main>
+  );
+}
+
+function RangeAttendanceView({ summary, records, search, onOpenRecord }) {
+  const term = search.trim().toLowerCase();
+
+  const filteredSummary = summary.filter((item) => {
+    const fullName = `${item.nombres || ''} ${item.apellidos || ''}`.toLowerCase();
+
+    return (
+      !term ||
+      fullName.includes(term) ||
+      String(item.dni || '').includes(term) ||
+      String(item.codigo_estudiante || '').toLowerCase().includes(term)
+    );
+  });
+
+  const filteredRecords = records.filter((item) => {
+    const fullName = `${item.nombres || ''} ${item.apellidos || ''}`.toLowerCase();
+
+    return (
+      !term ||
+      fullName.includes(term) ||
+      String(item.dni || '').includes(term) ||
+      String(item.codigo_estudiante || '').toLowerCase().includes(term)
+    );
+  });
+
+  return (
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-0 xl:gap-5">
+      <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[380px] overflow-y-auto">
+        {filteredSummary.length > 0 ? (
+          filteredSummary.map((item) => (
+            <RangeSummaryRow key={item.estudiante_id} item={item} />
+          ))
+        ) : (
+          <EmptyBlock text="No se encontraron estudiantes en el rango." />
+        )}
+      </div>
+
+      <div className="border-t xl:border-t-0 xl:border-l border-slate-100 divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[380px] overflow-y-auto">
+        {filteredRecords.length > 0 ? (
+          filteredRecords.map((item) => (
+            <RangeRecordRow
+              key={item.id}
+              item={item}
+              onClick={() => onOpenRecord(item)}
+            />
+          ))
+        ) : (
+          <EmptyBlock text="No hay registros de asistencia en este rango." />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RangeSummaryRow({ item }) {
+  return (
+    <div className="p-5 hover:bg-slate-50 transition">
+      <p className="font-extrabold text-brand-950">
+        {item.apellidos}, {item.nombres}
+      </p>
+
+      <p className="text-sm text-slate-500 mt-1">
+        DNI {item.dni} · Código {item.codigo_estudiante || 'No precisa'}
+      </p>
+
+      <div className="grid grid-cols-5 gap-2 mt-4">
+        <MiniState label="Total" value={item.total} />
+        <MiniState label="Pres." value={item.presente} />
+        <MiniState label="Tarde" value={item.tarde} />
+        <MiniState label="Falta" value={item.falta} />
+        <MiniState label="Just." value={item.justificado} />
+      </div>
+    </div>
+  );
+}
+
+function RangeRecordRow({ item, onClick }) {
+  const statusClass = stateStyles[item.estado] || stateStyles.sin_registro;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left p-5 hover:bg-slate-50 transition"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-extrabold text-brand-950">
+            {item.apellidos}, {item.nombres}
+          </p>
+
+          <p className="text-sm text-slate-500 mt-1">
+            {formatDate(item.fecha)}
+          </p>
+        </div>
+
+        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold border capitalize ${statusClass}`}>
+          {item.estado}
+        </span>
+      </div>
+
+      {item.observacion && (
+        <p className="text-xs text-slate-500 mt-3 line-clamp-2">
+          {item.observacion}
+        </p>
+      )}
+    </button>
+  );
+}
+
+function MiniState({ label, value }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
+      <p className="text-[10px] font-extrabold text-slate-500 uppercase">
+        {label}
+      </p>
+
+      <p className="text-lg font-extrabold text-brand-950 mt-1">
+        {Number(value || 0)}
+      </p>
+    </div>
+  );
+}
+
+function AttendanceRecordModal({ item, onClose }) {
+  const statusClass = stateStyles[item.estado] || stateStyles.sin_registro;
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <section className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="pr-10">
+          <p className="text-sm font-extrabold text-slate-500 uppercase tracking-[0.16em]">
+            Detalle de asistencia
+          </p>
+
+          <h2 className="text-2xl font-extrabold text-brand-950 mt-2">
+            {item.apellidos}, {item.nombres}
+          </h2>
+
+          <p className="text-sm text-slate-500 mt-1">
+            {formatDate(item.fecha)}
+          </p>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          <DetailRow label="DNI" value={item.dni} />
+          <DetailRow label="Código" value={item.codigo_estudiante} />
+
+          <div className="flex items-center justify-between gap-4 border border-slate-200 rounded-2xl p-4">
+            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+              Estado
+            </span>
+
+            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold border capitalize ${statusClass}`}>
+              {item.estado}
+            </span>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+              Observación
+            </p>
+
+            <p className="text-sm text-brand-950 mt-2 leading-relaxed">
+              {item.observacion?.trim() || 'Sin observación registrada.'}
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border border-slate-200 rounded-2xl p-4">
+      <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+        {label}
+      </span>
+
+      <span className="text-sm font-bold text-brand-950 text-right">
+        {value || 'No precisa'}
+      </span>
+    </div>
   );
 }
 
@@ -582,30 +903,6 @@ function CounterCard({ icon: Icon, label, value, description }) {
   );
 }
 
-function MessageBox({ type, message, onClose }) {
-  const success = type === 'success';
-
-  return (
-    <div className={`${success ? 'bg-green-50 border-green-100 text-success' : 'bg-red-50 border-red-100 text-danger'} border rounded-2xl p-4 flex items-start justify-between gap-3`}>
-      <div className="flex gap-3">
-        {success ? (
-          <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
-        ) : (
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        )}
-
-        <p className="text-sm font-semibold">
-          {message}
-        </p>
-      </div>
-
-      <button type="button" onClick={onClose} className="font-extrabold">
-        <X size={18} />
-      </button>
-    </div>
-  );
-}
-
 function EmptyBlock({ text }) {
   return (
     <div className="p-10 text-center">
@@ -621,12 +918,30 @@ function getToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function formatDate(value) {
-  if (!value) return 'No precisa';
+function getDateOnly(value) {
+  if (!value) return '';
 
-  return new Date(`${value}T00:00:00`).toLocaleDateString('es-PE', {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return String(value).slice(0, 10);
+}
+
+function formatDate(value) {
+  const dateOnly = getDateOnly(value);
+
+  if (!dateOnly) return 'Sin fecha';
+
+  const date = new Date(`${dateOnly}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Sin fecha';
+  }
+
+  return date.toLocaleDateString('es-PE', {
     day: '2-digit',
-    month: 'long',
+    month: 'short',
     year: 'numeric'
   });
 }

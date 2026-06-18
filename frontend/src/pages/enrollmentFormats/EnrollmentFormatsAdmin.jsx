@@ -17,6 +17,8 @@ import {
   X
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 import {
   createEnrollmentFormat,
   downloadEnrollmentFormat,
@@ -36,6 +38,8 @@ const statusStyles = {
 function EnrollmentFormatsAdmin() {
   const [formats, setFormats] = useState([]);
   const [selectedFormat, setSelectedFormat] = useState(null);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,6 +64,19 @@ function EnrollmentFormatsAdmin() {
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+    useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
   const [fileInputKey, setFileInputKey] = useState(Date.now());
 
   const loadFormats = async ({ silent = false } = {}) => {
@@ -150,6 +167,18 @@ function EnrollmentFormatsAdmin() {
     setSuccessMessage('');
   };
 
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    setError('');
+    setSuccessMessage('');
+  };
+
+  const closeDetailModal = () => {
+    setSelectedFormat(null);
+    setError('');
+    setSuccessMessage('');
+  };
+
   const handleCreateChange = (e) => {
     const { name, value } = e.target;
 
@@ -202,6 +231,7 @@ function EnrollmentFormatsAdmin() {
       });
 
       setFileInputKey(Date.now());
+      setShowCreateModal(false);
 
       await loadFormats({ silent: true });
     } catch (error) {
@@ -324,7 +354,9 @@ function EnrollmentFormatsAdmin() {
 
   const copyText = async (text) => {
     if (!text) return;
+
     await navigator.clipboard.writeText(String(text));
+    toast.success('Copiado al portapapeles.');
   };
 
   if (loading) {
@@ -358,35 +390,88 @@ function EnrollmentFormatsAdmin() {
         </button>
       </PageHeader>
 
-      {error && (
-        <MessageBox
-          type="error"
-          message={error}
-          onClose={() => setError('')}
-        />
-      )}
-
-      {successMessage && (
-        <MessageBox
-          type="success"
-          message={successMessage}
-          onClose={() => setSuccessMessage('')}
-        />
-      )}
-
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <CounterCard label="Total" value={counters.total} />
         <CounterCard label="Activos" value={counters.activo} status="activo" />
         <CounterCard label="Inactivos" value={counters.inactivo} status="inactivo" />
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        <div className="xl:col-span-5 space-y-5">
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+        <div className="p-5 border-b border-slate-100 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-extrabold text-brand-950">
+                Formatos registrados
+              </h2>
+
+              <p className="text-sm text-slate-500 mt-1">
+                Consulta, publica, edita y controla el estado de los formatos de matrícula.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center justify-center gap-2 bg-brand-950 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-900 transition"
+            >
+              <Plus size={18} />
+              Nuevo formato
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="relative">
+              <Search size={18} className="absolute left-3 top-3.5 text-slate-400" />
+
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Buscar formato"
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+              />
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+            >
+              <option value="todos">Todos los estados</option>
+              <option value="activo">Activos</option>
+              <option value="inactivo">Inactivos</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="divide-y divide-slate-100 max-h-[calc(100vh-430px)] min-h-[420px] overflow-y-auto">
+          {filteredFormats.length > 0 ? (
+            filteredFormats.map((format) => (
+              <FormatItem
+                key={format.id}
+                format={format}
+                active={selectedFormat?.id === format.id}
+                onClick={() => handleSelectFormat(format)}
+              />
+            ))
+          ) : (
+            <div className="p-10 text-center">
+              <FileText className="mx-auto text-slate-300" size={42} />
+              <p className="text-sm text-slate-500 mt-3">
+                No se encontraron formatos con los filtros aplicados.
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {showCreateModal && (
+        <FormatModal onClose={closeCreateModal}>
           <form
             onSubmit={handleCreateSubmit}
             className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 pr-10">
               <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
                 <Upload size={23} />
               </div>
@@ -452,238 +537,185 @@ function EnrollmentFormatsAdmin() {
               {!creating && <Plus size={18} />}
             </button>
           </form>
+        </FormatModal>
+      )}
 
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
-            <div className="p-5 border-b border-slate-100 space-y-4">
-              <div>
-                <h2 className="text-xl font-extrabold text-brand-950">
-                  Formatos registrados
-                </h2>
+      {selectedFormat && (
+        <FormatModal onClose={closeDetailModal}>
+          <div className="space-y-5">
+            <div className="bg-brand-950 text-white rounded-3xl shadow-soft p-6 relative overflow-hidden">
+              <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gold-500/20 blur-3xl" />
 
-                <p className="text-sm text-slate-500 mt-1">
-                  Selecciona un formato para editarlo o cambiar su estado.
-                </p>
-              </div>
+              <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 pr-10">
+                <div className="min-w-0">
+                  <span className="inline-flex rounded-full px-3 py-1 text-xs font-extrabold border bg-white/10 text-white border-white/20">
+                    {selectedFormat.estado}
+                  </span>
 
-              <div className="grid md:grid-cols-2 gap-3">
-                <div className="relative">
-                  <Search size={18} className="absolute left-3 top-3.5 text-slate-400" />
+                  <h2 className="text-2xl font-extrabold mt-4">
+                    {selectedFormat.titulo}
+                  </h2>
 
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Buscar formato"
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                  />
-                </div>
-
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                >
-                  <option value="todos">Todos los estados</option>
-                  <option value="activo">Activos</option>
-                  <option value="inactivo">Inactivos</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="divide-y divide-slate-100 max-h-[640px] overflow-y-auto">
-              {filteredFormats.length > 0 ? (
-                filteredFormats.map((format) => (
-                  <FormatItem
-                    key={format.id}
-                    format={format}
-                    active={selectedFormat?.id === format.id}
-                    onClick={() => handleSelectFormat(format)}
-                  />
-                ))
-              ) : (
-                <div className="p-8 text-center">
-                  <FileText className="mx-auto text-slate-300" size={42} />
-                  <p className="text-sm text-slate-500 mt-3">
-                    No se encontraron formatos con los filtros aplicados.
+                  <p className="text-sm text-blue-100 mt-2">
+                    {selectedFormat.nombre_archivo}
                   </p>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
 
-        <div className="xl:col-span-7">
-          {!selectedFormat ? (
-            <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-8 text-center">
-              <div className="mx-auto w-16 h-16 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center mb-4">
-                <FileText size={32} />
-              </div>
-
-              <h2 className="text-xl font-extrabold text-brand-950">
-                Selecciona un formato
-              </h2>
-
-              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-                Aquí podrás editar el título, descripción, estado y acceder al documento PDF.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <div className="bg-brand-950 text-white rounded-3xl shadow-soft p-6 relative overflow-hidden">
-                <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-gold-500/20 blur-3xl" />
-
-                <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-                  <div className="min-w-0">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold border bg-white/10 text-white border-white/20`}>
-                      {selectedFormat.estado}
-                    </span>
-
-                    <h2 className="text-2xl font-extrabold mt-4">
-                      {selectedFormat.titulo}
-                    </h2>
-
-                    <p className="text-sm text-blue-100 mt-2">
-                      {selectedFormat.nombre_archivo}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleView(selectedFormat)}
-                      disabled={selectedFormat.estado !== 'activo' || processingFileId === `view-${selectedFormat.id}`}
-                      className="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/10 text-white px-4 py-3 rounded-xl font-extrabold hover:bg-white/20 disabled:opacity-50 transition"
-                    >
-                      {processingFileId === `view-${selectedFormat.id}` ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <ExternalLink size={18} />
-                      )}
-                      Ver PDF
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDownload(selectedFormat)}
-                      disabled={selectedFormat.estado !== 'activo' || processingFileId === `download-${selectedFormat.id}`}
-                      className="inline-flex items-center justify-center gap-2 bg-gold-500 text-brand-950 px-4 py-3 rounded-xl font-extrabold hover:bg-gold-100 disabled:opacity-50 transition"
-                    >
-                      {processingFileId === `download-${selectedFormat.id}` ? (
-                        <Loader2 size={18} className="animate-spin" />
-                      ) : (
-                        <Download size={18} />
-                      )}
-                      Descargar
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {selectedFormat.estado !== 'activo' && (
-                <div className="bg-yellow-50 border border-yellow-100 text-warning rounded-2xl p-4 flex gap-3">
-                  <AlertCircle size={20} className="shrink-0 mt-0.5" />
-                  <p className="text-sm font-semibold">
-                    Este formato está inactivo. Según el backend actual, solo los formatos activos pueden visualizarse o descargarse.
-                  </p>
-                </div>
-              )}
-
-              <form
-                onSubmit={handleUpdateSubmit}
-                className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
-                    <Edit3 size={23} />
-                  </div>
-
-                  <div>
-                    <h3 className="font-extrabold text-brand-950 text-lg">
-                      Editar información
-                    </h3>
-
-                    <p className="text-sm text-slate-500">
-                      Actualiza el título y la descripción del formato.
-                    </p>
-                  </div>
-                </div>
-
-                <Input
-                  label="Título"
-                  name="titulo"
-                  value={editForm.titulo}
-                  onChange={handleEditChange}
-                  placeholder="Título del formato"
-                />
-
-                <Textarea
-                  label="Descripción"
-                  name="descripcion"
-                  value={editForm.descripcion}
-                  onChange={handleEditChange}
-                  placeholder="Descripción del formato"
-                />
-
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button
-                    type="submit"
-                    disabled={savingEdit}
-                    className="inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-800 disabled:opacity-60 transition"
+                    type="button"
+                    onClick={() => handleView(selectedFormat)}
+                    disabled={selectedFormat.estado !== 'activo' || processingFileId === `view-${selectedFormat.id}`}
+                    className="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/10 text-white px-4 py-3 rounded-xl font-extrabold hover:bg-white/20 disabled:opacity-50 transition"
                   >
-                    {savingEdit ? 'Guardando...' : 'Guardar cambios'}
-                    {!savingEdit && <CheckCircle2 size={18} />}
+                    {processingFileId === `view-${selectedFormat.id}` ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <ExternalLink size={18} />
+                    )}
+                    Ver PDF
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => handleToggleStatus(selectedFormat)}
-                    disabled={processingStatusId === selectedFormat.id}
-                    className={`inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-extrabold disabled:opacity-60 transition ${
-                      selectedFormat.estado === 'activo'
-                        ? 'bg-red-50 border border-red-100 text-danger hover:bg-red-100'
-                        : 'bg-green-50 border border-green-100 text-success hover:bg-green-100'
-                    }`}
+                    onClick={() => handleDownload(selectedFormat)}
+                    disabled={selectedFormat.estado !== 'activo' || processingFileId === `download-${selectedFormat.id}`}
+                    className="inline-flex items-center justify-center gap-2 bg-gold-500 text-brand-950 px-4 py-3 rounded-xl font-extrabold hover:bg-gold-100 disabled:opacity-50 transition"
                   >
-                    {processingStatusId === selectedFormat.id ? (
+                    {processingFileId === `download-${selectedFormat.id}` ? (
                       <Loader2 size={18} className="animate-spin" />
-                    ) : selectedFormat.estado === 'activo' ? (
-                      <ToggleLeft size={20} />
                     ) : (
-                      <ToggleRight size={20} />
+                      <Download size={18} />
                     )}
-
-                    {selectedFormat.estado === 'activo'
-                      ? 'Desactivar formato'
-                      : 'Activar formato'}
+                    Descargar
                   </button>
-                </div>
-              </form>
-
-              <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
-                    <FileText size={23} />
-                  </div>
-
-                  <h3 className="font-extrabold text-brand-950 text-lg">
-                    Detalle del registro
-                  </h3>
-                </div>
-
-                <div className="space-y-3">
-                  <DetailRow label="ID" value={selectedFormat.id} onCopy={copyText} />
-                  <DetailRow label="Archivo" value={selectedFormat.nombre_archivo} onCopy={copyText} />
-                  <DetailRow label="Storage path" value={selectedFormat.storage_path} onCopy={copyText} />
-                  <DetailRow label="Publicado por" value={getPublisherName(selectedFormat)} />
-                  <DetailRow label="Creado" value={formatDate(selectedFormat.created_at)} />
-                  <DetailRow label="Actualizado" value={formatDate(selectedFormat.updated_at)} />
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </section>
+
+            {selectedFormat.estado !== 'activo' && (
+              <div className="bg-yellow-50 border border-yellow-100 text-warning rounded-2xl p-4 flex gap-3">
+                <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                <p className="text-sm font-semibold">
+                  Este formato está inactivo. Según el backend actual, solo los formatos activos pueden visualizarse o descargarse.
+                </p>
+              </div>
+            )}
+
+            <form
+              onSubmit={handleUpdateSubmit}
+              className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
+                  <Edit3 size={23} />
+                </div>
+
+                <div>
+                  <h3 className="font-extrabold text-brand-950 text-lg">
+                    Editar información
+                  </h3>
+
+                  <p className="text-sm text-slate-500">
+                    Actualiza el título y la descripción del formato.
+                  </p>
+                </div>
+              </div>
+
+              <Input
+                label="Título"
+                name="titulo"
+                value={editForm.titulo}
+                onChange={handleEditChange}
+                placeholder="Título del formato"
+              />
+
+              <Textarea
+                label="Descripción"
+                name="descripcion"
+                value={editForm.descripcion}
+                onChange={handleEditChange}
+                placeholder="Descripción del formato"
+              />
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-800 disabled:opacity-60 transition"
+                >
+                  {savingEdit ? 'Guardando...' : 'Guardar cambios'}
+                  {!savingEdit && <CheckCircle2 size={18} />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleToggleStatus(selectedFormat)}
+                  disabled={processingStatusId === selectedFormat.id}
+                  className={`inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-extrabold disabled:opacity-60 transition ${
+                    selectedFormat.estado === 'activo'
+                      ? 'bg-red-50 border border-red-100 text-danger hover:bg-red-100'
+                      : 'bg-green-50 border border-green-100 text-success hover:bg-green-100'
+                  }`}
+                >
+                  {processingStatusId === selectedFormat.id ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : selectedFormat.estado === 'activo' ? (
+                    <ToggleLeft size={20} />
+                  ) : (
+                    <ToggleRight size={20} />
+                  )}
+
+                  {selectedFormat.estado === 'activo'
+                    ? 'Desactivar formato'
+                    : 'Activar formato'}
+                </button>
+              </div>
+            </form>
+
+            <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
+                  <FileText size={23} />
+                </div>
+
+                <h3 className="font-extrabold text-brand-950 text-lg">
+                  Detalle del registro
+                </h3>
+              </div>
+
+              <div className="space-y-3">
+                <DetailRow label="ID" value={selectedFormat.id} onCopy={copyText} />
+                <DetailRow label="Archivo" value={selectedFormat.nombre_archivo} onCopy={copyText} />
+                <DetailRow label="Storage path" value={selectedFormat.storage_path} onCopy={copyText} />
+                <DetailRow label="Publicado por" value={getPublisherName(selectedFormat)} />
+                <DetailRow label="Creado" value={formatDate(selectedFormat.created_at)} />
+                <DetailRow label="Actualizado" value={formatDate(selectedFormat.updated_at)} />
+              </div>
+            </div>
+          </div>
+        </FormatModal>
+      )}
     </main>
+  );
+}
+
+function FormatModal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-6">
+      <section className="relative w-full lg:max-w-5xl max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        {children}
+      </section>
+    </div>
   );
 }
 
@@ -824,34 +856,6 @@ function DetailRow({ label, value, onCopy }) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function MessageBox({ type, message, onClose }) {
-  const success = type === 'success';
-
-  return (
-    <div className={`${success ? 'bg-green-50 border-green-100 text-success' : 'bg-red-50 border-red-100 text-danger'} border rounded-2xl p-4 flex items-start justify-between gap-3`}>
-      <div className="flex gap-3">
-        {success ? (
-          <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
-        ) : (
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        )}
-
-        <p className="text-sm font-semibold">
-          {message}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="font-extrabold"
-      >
-        <X size={18} />
-      </button>
     </div>
   );
 }

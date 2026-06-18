@@ -15,10 +15,13 @@ import {
   Search,
   User,
   Users,
+  X,
   XCircle,
   Download,
   ExternalLink
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import {
   getAvailableClassrooms,
@@ -65,6 +68,20 @@ function EnrollmentRequestsAdmin() {
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
   const [processingDocumentId, setProcessingDocumentId] = useState(null);
 
@@ -236,6 +253,16 @@ function EnrollmentRequestsAdmin() {
     });
   }, [requests, searchTerm, selectedStatus]);
 
+  const closeDetailModal = () => {
+    setSelectedRequest(null);
+    setDocuments([]);
+    setAvailableClassrooms([]);
+    setSelectedClassroomId('');
+    setObservation('');
+    setError('');
+    setSuccessMessage('');
+  };
+
   const handleApprove = async () => {
     if (!selectedRequest) return;
 
@@ -320,7 +347,9 @@ function EnrollmentRequestsAdmin() {
 
   const copyText = async (text) => {
     if (!text) return;
+
     await navigator.clipboard.writeText(String(text));
+    toast.success('Copiado al portapapeles.');
   };
 
   const canManage =
@@ -358,22 +387,6 @@ function EnrollmentRequestsAdmin() {
         </button>
       </PageHeader>
 
-      {error && (
-        <MessageBox
-          type="error"
-          message={error}
-          onClose={() => setError('')}
-        />
-      )}
-
-      {successMessage && (
-        <MessageBox
-          type="success"
-          message={successMessage}
-          onClose={() => setSuccessMessage('')}
-        />
-      )}
-
       <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <CounterCard label="Total" value={counters.total} />
         <CounterCard label="Pendientes" value={counters.pendiente} status="pendiente" />
@@ -382,21 +395,23 @@ function EnrollmentRequestsAdmin() {
         <CounterCard label="Rechazadas" value={counters.rechazado} status="rechazado" />
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        <div className="xl:col-span-5 bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
-          <div className="p-5 border-b border-slate-100 space-y-4">
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+        <div className="p-5 border-b border-slate-100 space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
             <div>
               <h2 className="text-xl font-extrabold text-brand-950">
                 Solicitudes
               </h2>
+
               <p className="text-sm text-slate-500 mt-1">
-                Selecciona una solicitud para revisar el detalle.
+                Revisa solicitudes registradas y abre el detalle en una ventana emergente.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 lg:min-w-[560px]">
               <div className="relative">
                 <Search size={18} className="absolute left-3 top-3.5 text-slate-400" />
+
                 <input
                   type="text"
                   value={searchTerm}
@@ -419,163 +434,171 @@ function EnrollmentRequestsAdmin() {
               </select>
             </div>
           </div>
-
-          <div className="divide-y divide-slate-100 max-h-[760px] overflow-y-auto">
-            {filteredRequests.length > 0 ? (
-              filteredRequests.map((request) => (
-                <RequestItem
-                  key={request.id}
-                  request={request}
-                  active={selectedRequest?.id === request.id}
-                  onClick={() => loadRequestDetail(request.id)}
-                />
-              ))
-            ) : (
-              <div className="p-8 text-center">
-                <ClipboardList className="mx-auto text-slate-300" size={42} />
-                <p className="text-sm text-slate-500 mt-3">
-                  No se encontraron solicitudes con los filtros aplicados.
-                </p>
-              </div>
-            )}
-          </div>
         </div>
 
-        <div className="xl:col-span-7">
-          {!selectedRequest && (
-            <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-8 text-center">
-              <div className="mx-auto w-16 h-16 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center mb-4">
-                <FileText size={32} />
-              </div>
-
-              <h2 className="text-xl font-extrabold text-brand-950">
-                Selecciona una solicitud
-              </h2>
-
-              <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto">
-                Aquí se mostrará el detalle del estudiante, apoderado, documentos y acciones administrativas.
+        <div className="divide-y divide-slate-100 max-h-[calc(100vh-430px)] min-h-[420px] overflow-y-auto">
+          {filteredRequests.length > 0 ? (
+            filteredRequests.map((request) => (
+              <RequestItem
+                key={request.id}
+                request={request}
+                active={selectedRequest?.id === request.id}
+                onClick={() => loadRequestDetail(request.id)}
+              />
+            ))
+          ) : (
+            <div className="p-10 text-center">
+              <ClipboardList className="mx-auto text-slate-300" size={42} />
+              <p className="text-sm text-slate-500 mt-3">
+                No se encontraron solicitudes con los filtros aplicados.
               </p>
-            </div>
-          )}
-
-          {loadingDetail && (
-            <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-8 text-center">
-              <Loader2 className="mx-auto animate-spin text-brand-900" size={34} />
-              <p className="text-sm font-semibold text-slate-500 mt-4">
-                Cargando detalle de la solicitud...
-              </p>
-            </div>
-          )}
-
-          {selectedRequest && !loadingDetail && (
-            <div className="space-y-5">
-              <DetailHeader
-                request={selectedRequest}
-                onCopy={copyText}
-              />
-
-              <div className="grid md:grid-cols-2 gap-5">
-                <InfoCard
-                  icon={User}
-                  title="Estudiante"
-                  items={[
-                    ['DNI', selectedRequest.estudiante_dni],
-                    ['Nombres', selectedRequest.estudiante_nombres],
-                    ['Apellidos', selectedRequest.estudiante_apellidos],
-                    ['Fecha de nacimiento', formatDate(selectedRequest.estudiante_fecha_nacimiento)],
-                    ['Dirección', selectedRequest.estudiante_direccion]
-                  ]}
-                />
-
-                <InfoCard
-                  icon={Users}
-                  title="Apoderado"
-                  items={[
-                    ['DNI', selectedRequest.apoderado_dni],
-                    ['Nombres', selectedRequest.apoderado_nombres],
-                    ['Apellidos', selectedRequest.apoderado_apellidos],
-                    ['Teléfono', selectedRequest.apoderado_telefono],
-                    ['Parentesco', selectedRequest.parentesco],
-                    ['Dirección', selectedRequest.apoderado_direccion]
-                  ]}
-                />
-              </div>
-
-              <InfoCard
-                icon={GraduationCap}
-                title="Datos académicos"
-                items={[
-                  ['Grado solicitado', selectedRequest.grado],
-                  ['Turno solicitado', selectedRequest.turno],
-                  ['Periodo académico', selectedRequest.periodo],
-                  [
-                    'Sección asignada',
-                    selectedRequest.seccion_asignada ||
-                    selectedRequest.seccion ||
-                    'Pendiente de asignación'
-                  ],
-                  [
-                    'Aula asignada',
-                    selectedRequest.aula_asignada_id
-                      ? `Aula ID ${selectedRequest.aula_asignada_id}`
-                      : selectedRequest.aula_id_asignada
-                        ? `Aula ID ${selectedRequest.aula_id_asignada}`
-                        : 'Pendiente'
-                  ],
-                  ['Fecha de registro', formatDate(selectedRequest.created_at)]
-                ]}
-              />
-
-              {selectedRequest.observacion && (
-                <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
-                  <div className="flex gap-3">
-                    <AlertCircle className="text-warning shrink-0 mt-0.5" size={22} />
-                    <div>
-                      <h3 className="font-extrabold text-brand-950">
-                        Observación administrativa
-                      </h3>
-                      <p className="text-sm text-slate-600 mt-2">
-                        {selectedRequest.observacion}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <DocumentsPanel
-                documents={documents}
-                onView={handleViewDocument}
-                onDownload={handleDownloadDocument}
-                processingDocumentId={processingDocumentId}
-              />
-
-              {selectedRequest.credenciales_generadas && (
-                <CredentialsPanel
-                  credentials={selectedRequest.credenciales_generadas}
-                  onCopy={copyText}
-                />
-              )}
-
-              {canManage && (
-                <AdminActionsPanel
-                  request={selectedRequest}
-                  classrooms={availableClassrooms}
-                  selectedClassroomId={selectedClassroomId}
-                  setSelectedClassroomId={setSelectedClassroomId}
-                  observation={observation}
-                  setObservation={setObservation}
-                  loadingClassrooms={loadingClassrooms}
-                  processingAction={processingAction}
-                  onApprove={handleApprove}
-                  onObserve={() => handleObserveOrReject('observado')}
-                  onReject={() => handleObserveOrReject('rechazado')}
-                />
-              )}
             </div>
           )}
         </div>
       </section>
+
+      {loadingDetail && (
+        <EnrollmentRequestModal onClose={closeDetailModal}>
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-8 text-center">
+            <Loader2 className="mx-auto animate-spin text-brand-900" size={34} />
+
+            <p className="text-sm font-semibold text-slate-500 mt-4">
+              Cargando detalle de la solicitud...
+            </p>
+          </div>
+        </EnrollmentRequestModal>
+      )}
+
+      {selectedRequest && !loadingDetail && (
+        <EnrollmentRequestModal onClose={closeDetailModal}>
+          <div className="space-y-5">
+            <DetailHeader
+              request={selectedRequest}
+              onCopy={copyText}
+            />
+
+            <div className="grid md:grid-cols-2 gap-5">
+              <InfoCard
+                icon={User}
+                title="Estudiante"
+                items={[
+                  ['DNI', selectedRequest.estudiante_dni],
+                  ['Nombres', selectedRequest.estudiante_nombres],
+                  ['Apellidos', selectedRequest.estudiante_apellidos],
+                  ['Fecha de nacimiento', formatDate(selectedRequest.estudiante_fecha_nacimiento)],
+                  ['Dirección', selectedRequest.estudiante_direccion]
+                ]}
+              />
+
+              <InfoCard
+                icon={Users}
+                title="Apoderado"
+                items={[
+                  ['DNI', selectedRequest.apoderado_dni],
+                  ['Nombres', selectedRequest.apoderado_nombres],
+                  ['Apellidos', selectedRequest.apoderado_apellidos],
+                  ['Teléfono', selectedRequest.apoderado_telefono],
+                  ['Parentesco', selectedRequest.parentesco],
+                  ['Dirección', selectedRequest.apoderado_direccion]
+                ]}
+              />
+            </div>
+
+            <InfoCard
+              icon={GraduationCap}
+              title="Datos académicos"
+              items={[
+                ['Grado solicitado', selectedRequest.grado],
+                ['Turno solicitado', selectedRequest.turno],
+                ['Periodo académico', selectedRequest.periodo],
+                [
+                  'Sección asignada',
+                  selectedRequest.seccion_asignada ||
+                  selectedRequest.seccion ||
+                  'Pendiente de asignación'
+                ],
+                [
+                  'Aula asignada',
+                  selectedRequest.aula_asignada_id
+                    ? `Aula ID ${selectedRequest.aula_asignada_id}`
+                    : selectedRequest.aula_id_asignada
+                      ? `Aula ID ${selectedRequest.aula_id_asignada}`
+                      : 'Pendiente'
+                ],
+                ['Fecha de registro', formatDate(selectedRequest.created_at)]
+              ]}
+            />
+
+            {selectedRequest.observacion && (
+              <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
+                <div className="flex gap-3">
+                  <AlertCircle className="text-warning shrink-0 mt-0.5" size={22} />
+
+                  <div>
+                    <h3 className="font-extrabold text-brand-950">
+                      Observación administrativa
+                    </h3>
+
+                    <p className="text-sm text-slate-600 mt-2">
+                      {selectedRequest.observacion}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DocumentsPanel
+              documents={documents}
+              onView={handleViewDocument}
+              onDownload={handleDownloadDocument}
+              processingDocumentId={processingDocumentId}
+            />
+
+            {selectedRequest.credenciales_generadas && (
+              <CredentialsPanel
+                credentials={selectedRequest.credenciales_generadas}
+                onCopy={copyText}
+              />
+            )}
+
+            {canManage && (
+              <AdminActionsPanel
+                request={selectedRequest}
+                classrooms={availableClassrooms}
+                selectedClassroomId={selectedClassroomId}
+                setSelectedClassroomId={setSelectedClassroomId}
+                observation={observation}
+                setObservation={setObservation}
+                loadingClassrooms={loadingClassrooms}
+                processingAction={processingAction}
+                onApprove={handleApprove}
+                onObserve={() => handleObserveOrReject('observado')}
+                onReject={() => handleObserveOrReject('rechazado')}
+              />
+            )}
+          </div>
+        </EnrollmentRequestModal>
+      )}
     </main>
+  );
+}
+
+function EnrollmentRequestModal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-6">
+      <section className="relative w-full lg:max-w-5xl max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        {children}
+      </section>
+    </div>
   );
 }
 

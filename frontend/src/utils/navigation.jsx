@@ -239,39 +239,39 @@ export const navigationItems = [
     roles: ['Apoderado']
   },
 
-  // Comunicados
+  // Avisos
   {
-    label: 'Comunicados',
+    label: 'Avisos',
     path: '/director/announcements',
     icon: Bell,
     roles: ['Director']
   },
   {
-    label: 'Comunicados',
+    label: 'Avisos',
     path: '/admin/announcements',
     icon: Bell,
     roles: ['Administrativo']
   },
   {
-    label: 'Comunicados',
+    label: 'Avisos',
     path: '/auxiliary/announcements',
     icon: Bell,
     roles: ['Auxiliar']
   },
   {
-    label: 'Comunicados',
+    label: 'Avisos',
     path: '/teacher/announcements',
     icon: Bell,
     roles: ['Docente']
   },
   {
-    label: 'Comunicados',
+    label: 'Avisos',
     path: '/student/announcements',
     icon: Bell,
     roles: ['Estudiante']
   },
   {
-    label: 'Comunicados',
+    label: 'Avisos',
     path: '/guardian/announcements',
     icon: Bell,
     roles: ['Apoderado']

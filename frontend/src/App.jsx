@@ -61,6 +61,8 @@ import SettingsAdmin from './pages/settings/SettingsAdmin';
 
 import GuardianChildren from './pages/guardians/GuardianChildren';
 
+import AuxiliaryStudents from './pages/students/AuxiliaryStudents';
+
 const protectedElement = (element, roles = null) => {
   return (
     <ProtectedRoute>
@@ -314,7 +316,15 @@ function App() {
             ['Auxiliar']
           )}
         />
-        <Route path="/auxiliary/students" element={protectedElement(<ModulePage title="Estudiantes" description="Consulta de estudiantes y seguimiento." />, ['Auxiliar'])} />
+        <Route
+          path="/auxiliary/students"
+          element={protectedElement(
+            <DashboardLayout>
+              <AuxiliaryStudents />
+            </DashboardLayout>,
+            ['Auxiliar']
+          )}
+        />
         <Route
           path="/auxiliary/reports"
           element={protectedElement(

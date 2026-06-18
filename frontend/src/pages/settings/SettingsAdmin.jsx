@@ -15,6 +15,8 @@ import {
   CalendarDays
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 import {
   getAcademicPeriodsForSettings,
   getMySettings
@@ -48,6 +50,20 @@ function SettingsAdmin() {
   const [savingTheme, setSavingTheme] = useState('');
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
   const isDirector = role === 'Director';
 
@@ -160,9 +176,6 @@ function SettingsAdmin() {
           </button>
         </div>
       </section>
-
-      {error && <Message type="error" text={error} />}
-      {successMessage && <Message type="success" text={successMessage} />}
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <article className="xl:col-span-2 bg-white border border-slate-200 rounded-3xl shadow-soft p-6">

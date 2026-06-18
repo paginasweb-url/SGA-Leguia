@@ -63,6 +63,24 @@ const documentTypes = [
   }
 ];
 
+const onlyDigits = (value) => {
+  return String(value || '').replace(/\D/g, '');
+};
+
+const isValidDni = (value) => {
+  return /^\d{8}$/.test(String(value || ''));
+};
+
+const isValidPeruvianPhone = (value) => {
+  return /^9\d{8}$/.test(String(value || ''));
+};
+
+const numericFieldMaxLength = {
+  estudiante_dni: 8,
+  apoderado_dni: 8,
+  apoderado_telefono: 9
+};
+
 function EnrollmentRequest() {
   const [form, setForm] = useState(initialForm);
   const [options, setOptions] = useState({
@@ -116,9 +134,15 @@ function EnrollmentRequest() {
   const handleChange = (e) => {
     const { name, value } = e.target;
 
+    let nextValue = value;
+
+    if (numericFieldMaxLength[name]) {
+      nextValue = onlyDigits(value).slice(0, numericFieldMaxLength[name]);
+    }
+
     setForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
   };
 
@@ -137,7 +161,7 @@ function EnrollmentRequest() {
     });
   };
 
-  const validateForm = () => {
+  const getFormValidationError = () => {
     const requiredFields = [
       'estudiante_dni',
       'estudiante_nombres',
@@ -155,7 +179,25 @@ function EnrollmentRequest() {
       'periodo_id'
     ];
 
-    return requiredFields.every((field) => Boolean(form[field]));
+    const hasEmptyRequiredField = requiredFields.some((field) => !form[field]);
+
+    if (hasEmptyRequiredField) {
+      return 'Completa todos los campos obligatorios.';
+    }
+
+    if (!isValidDni(form.estudiante_dni)) {
+      return 'El DNI del estudiante debe contener exactamente 8 números.';
+    }
+
+    if (!isValidDni(form.apoderado_dni)) {
+      return 'El DNI del apoderado debe contener exactamente 8 números.';
+    }
+
+    if (!isValidPeruvianPhone(form.apoderado_telefono)) {
+      return 'El teléfono del apoderado debe contener 9 dígitos y empezar con 9.';
+    }
+
+    return null;
   };
 
   const uploadSelectedDocuments = async (requestId) => {
@@ -204,8 +246,10 @@ function EnrollmentRequest() {
       setResult(null);
       setUploadSummary([]);
 
-      if (!validateForm()) {
-        setError('Completa todos los campos obligatorios.');
+      const validationError = getFormValidationError();
+
+      if (validationError) {
+        setError(validationError);
         return;
       }
 
@@ -429,6 +473,9 @@ function EnrollmentRequest() {
                   onChange={handleChange}
                   placeholder="12341234"
                   maxLength={8}
+                  inputMode="numeric"
+                  pattern="[0-9]{8}"
+                  helperText="Debe contener exactamente 8 dígitos."
                 />
 
                 <Input
@@ -480,6 +527,9 @@ function EnrollmentRequest() {
                   onChange={handleChange}
                   placeholder="43214321"
                   maxLength={8}
+                  inputMode="numeric"
+                  pattern="[0-9]{8}"
+                  helperText="Debe contener exactamente 8 dígitos."
                 />
 
                 <Input
@@ -505,6 +555,10 @@ function EnrollmentRequest() {
                   onChange={handleChange}
                   placeholder="987654321"
                   icon={Phone}
+                  maxLength={9}
+                  inputMode="numeric"
+                  pattern="9[0-9]{8}"
+                  helperText="Debe tener 9 dígitos y empezar con 9."
                 />
 
                 <Input
@@ -732,6 +786,10 @@ function Input({
   placeholder,
   type = 'text',
   maxLength,
+  minLength,
+  inputMode,
+  pattern,
+  helperText,
   icon: Icon
 }) {
   return (
@@ -752,10 +810,18 @@ function Input({
           onChange={onChange}
           placeholder={placeholder}
           maxLength={maxLength}
+          minLength={minLength}
+          inputMode={inputMode}
+          pattern={pattern}
           required
           className={`w-full ${Icon ? 'pl-10' : 'pl-4'} pr-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800`}
         />
       </div>
+      {helperText && (
+        <p className="text-xs text-slate-500 mt-1">
+          {helperText}
+        </p>
+      )}
     </label>
   );
 }

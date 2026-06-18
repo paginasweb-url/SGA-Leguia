@@ -19,3 +19,16 @@ export const deactivateStudentRequest = async (id) => {
   const response = await api.patch(`/students/${id}/deactivate`);
   return response.data;
 };
+
+export const getAuxiliaryStudentsRequest = async (params = {}) => {
+  const response = await api.get('/students/auxiliary', {
+    params
+  });
+
+  return response.data;
+};
+
+export const getStudentAttendanceForAuxiliary = async (studentId) => {
+  const response = await api.get(`/attendance/student/${studentId}`);
+  return response.data;
+};

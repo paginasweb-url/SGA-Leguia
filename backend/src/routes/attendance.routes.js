@@ -4,6 +4,7 @@ import {
   getClassroomStudentsForAttendance,
   registerClassroomAttendance,
   getClassroomAttendanceByDate,
+  getClassroomAttendanceByRange,
   getStudentAttendance,
   getClassroomAttendanceSummary,
   getAttendanceClassrooms,
@@ -43,6 +44,13 @@ router.post(
   verifyToken,
   authorizeRoles('Auxiliar'),
   registerClassroomAttendance
+);
+
+router.get(
+  '/classroom/:aulaId/range',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo', 'Auxiliar'),
+  getClassroomAttendanceByRange
 );
 
 router.get(

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import {
   AlertCircle,
   CheckCircle2,
@@ -111,6 +112,19 @@ function UsersAdmin() {
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
   const availableCreateTypes = isDirector
     ? ['Docente', 'Administrativo', 'Auxiliar']
@@ -262,10 +276,33 @@ function UsersAdmin() {
     });
   };
 
+  const onlyDigits = (value) => {
+    return String(value || '').replace(/\D/g, '');
+  };
+
+  const isValidDni = (value) => {
+    return /^\d{8}$/.test(String(value || ''));
+  };
+
+  const isValidPeruvianPhone = (value) => {
+    return /^9\d{8}$/.test(String(value || ''));
+  };
+
+  const numericFieldMaxLength = {
+    dni: 8,
+    telefono: 9
+  };
+
   const handleCreateChange = (name, value) => {
+    let nextValue = value;
+
+    if (numericFieldMaxLength[name]) {
+      nextValue = onlyDigits(value).slice(0, numericFieldMaxLength[name]);
+    }
+
     setCreateForm((prev) => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
   };
 
@@ -309,6 +346,16 @@ function UsersAdmin() {
 
       if (!nombres.trim() || !apellidos.trim() || !dni.trim()) {
         setError('Nombres, apellidos y DNI son obligatorios.');
+        return;
+      }
+
+      if (!isValidDni(createForm.dni)) {
+        setError('El DNI debe contener exactamente 8 números.');
+        return;
+      }
+
+      if (createForm.telefono && !isValidPeruvianPhone(createForm.telefono)) {
+        setError('El teléfono debe contener 9 dígitos y empezar con 9.');
         return;
       }
 
@@ -437,6 +484,8 @@ function UsersAdmin() {
 
       setSuccessMessage('Usuario actualizado correctamente.');
 
+      setSelectedUser(null);
+
       await loadData({ silent: true });
     } catch (error) {
       setError(
@@ -494,11 +543,21 @@ function UsersAdmin() {
 
   const copyText = async (text) => {
     if (!text) return;
+
     await navigator.clipboard.writeText(String(text));
+    toast.success('Copiado al portapapeles.');
   };
 
   const openCreatePanel = () => {
     setShowCreate(true);
+    setSelectedUser(null);
+    setCredentials(null);
+    setError('');
+    setSuccessMessage('');
+  };
+
+  const closeUserModal = () => {
+    setShowCreate(false);
     setSelectedUser(null);
     setCredentials(null);
     setError('');
@@ -561,18 +620,6 @@ function UsersAdmin() {
         </div>
       </section>
 
-      {error && (
-        <MessageBox type="error" message={error} onClose={() => setError('')} />
-      )}
-
-      {successMessage && (
-        <MessageBox type="success" message={successMessage} onClose={() => setSuccessMessage('')} />
-      )}
-
-      {credentials && (
-        <CredentialsBox credentials={credentials} onCopy={copyText} />
-      )}
-
       <section className="grid grid-cols-1 md:grid-cols-4 gap-5">
         <CounterCard icon={Users} label="Total" value={counters.total} description="Usuarios visibles" />
         <CounterCard icon={CheckCircle2} label="Activos" value={counters.activos} description="Usuarios activos" />
@@ -632,36 +679,40 @@ function UsersAdmin() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        <div className="xl:col-span-7 bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
-  <div className="hidden md:grid grid-cols-12 bg-slate-50 border-b border-slate-200 px-6 py-4 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
-            <div className="col-span-4">Usuario</div>
-            <div className="col-span-3">Correo</div>
-            <div className="col-span-2 text-center">Rol</div>
-            <div className="col-span-1 text-center">Estado</div>
-            <div className="col-span-2 text-right">Acciones</div>
-          </div>
-
-         <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[360px] overflow-y-auto">
-            {filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => (
-                <UserRow
-                  key={user.id}
-                  user={user}
-                  active={selectedUser?.id === user.id}
-                  deactivating={deactivatingId === user.id}
-                  onSelect={() => handleSelectUser(user)}
-                  onDeactivate={() => handleDeactivate(user)}
-                />
-              ))
-            ) : (
-              <EmptyBlock text="No se encontraron usuarios con los filtros aplicados." />
-            )}
-          </div>
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+        <div className="hidden md:grid grid-cols-12 bg-slate-50 border-b border-slate-200 px-6 py-4 text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+          <div className="col-span-4">Usuario</div>
+          <div className="col-span-3">Correo</div>
+          <div className="col-span-2 text-center">Rol</div>
+          <div className="col-span-1 text-center">Estado</div>
+          <div className="col-span-2 text-right">Acciones</div>
         </div>
 
-        <div className="xl:col-span-5">
-          {showCreate ? (
+        <div className="divide-y divide-slate-100 max-h-[calc(100vh-420px)] min-h-[420px] overflow-y-auto">
+          {filteredUsers.length > 0 ? (
+            filteredUsers.map((user) => (
+              <UserRow
+                key={user.id}
+                user={user}
+                active={selectedUser?.id === user.id}
+                deactivating={deactivatingId === user.id}
+                onSelect={() => handleSelectUser(user)}
+                onDeactivate={() => handleDeactivate(user)}
+              />
+            ))
+          ) : (
+            <EmptyBlock text="No se encontraron usuarios con los filtros aplicados." />
+          )}
+        </div>
+      </section>
+
+      {showCreate && (
+        <UserModal onClose={closeUserModal}>
+          <div className="space-y-4">
+            {credentials && (
+              <CredentialsBox credentials={credentials} onCopy={copyText} />
+            )}
+
             <CreateUserPanel
               form={createForm}
               availableCreateTypes={availableCreateTypes}
@@ -670,21 +721,42 @@ function UsersAdmin() {
               onChange={handleCreateChange}
               onSubmit={handleCreate}
             />
-          ) : selectedUser ? (
-            <UserDetailPanel
-              user={selectedUser}
-              form={editForm}
-              saving={saving}
-              onChange={handleEditChange}
-              onSubmit={handleUpdate}
-              onCopy={copyText}
-            />
-          ) : (
-            <EmptyDetail />
-          )}
-        </div>
-      </section>
+          </div>
+        </UserModal>
+      )}
+
+      {selectedUser && (
+        <UserModal onClose={closeUserModal}>
+          <UserDetailPanel
+            user={selectedUser}
+            form={editForm}
+            saving={saving}
+            onChange={handleEditChange}
+            onSubmit={handleUpdate}
+            onCopy={copyText}
+          />
+        </UserModal>
+      )}
     </main>
+  );
+}
+
+function UserModal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-6">
+      <section className="relative w-full lg:max-w-3xl max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        {children}
+      </section>
+    </div>
   );
 }
 
@@ -827,8 +899,27 @@ function CreateUserPanel({
 
       <InputField label="Nombres" value={form.nombres} onChange={(value) => onChange('nombres', value)} />
       <InputField label="Apellidos" value={form.apellidos} onChange={(value) => onChange('apellidos', value)} />
-      <InputField label="DNI" value={form.dni} onChange={(value) => onChange('dni', value)} />
-      <InputField label="Teléfono" value={form.telefono} onChange={(value) => onChange('telefono', value)} />
+      <InputField
+        label="DNI"
+        value={form.dni}
+        onChange={(value) => onChange('dni', value)}
+        placeholder="12345678"
+        maxLength={8}
+        inputMode="numeric"
+        pattern="[0-9]{8}"
+        helperText="Debe contener exactamente 8 dígitos."
+      />
+
+      <InputField
+        label="Teléfono"
+        value={form.telefono}
+        onChange={(value) => onChange('telefono', value)}
+        placeholder="987654321"
+        maxLength={9}
+        inputMode="numeric"
+        pattern="9[0-9]{8}"
+        helperText="Debe tener 9 dígitos y empezar con 9."
+      />
 
       {form.tipo === 'Docente' && (
         <InputField
@@ -1067,7 +1158,11 @@ function InputField({
   value,
   onChange,
   placeholder,
-  type = 'text'
+  type = 'text',
+  maxLength,
+  inputMode,
+  pattern,
+  helperText
 }) {
   return (
     <label className="block">
@@ -1080,8 +1175,17 @@ function InputField({
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        pattern={pattern}
         className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
       />
+
+      {helperText && (
+        <p className="text-xs text-slate-500 mt-1">
+          {helperText}
+        </p>
+      )}
     </label>
   );
 }

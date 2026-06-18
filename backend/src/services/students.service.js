@@ -255,3 +255,159 @@ export const deactivateStudent = async (id) => {
     client.release();
   }
 };
+
+export const getStudentsForAuxiliary = async ({
+  search,
+  grado,
+  aula_id,
+  turno,
+  estado = 'activo'
+} = {}) => {
+  const values = [];
+  const conditions = [];
+
+  if (estado) {
+    values.push(estado);
+    conditions.push(`e.estado = $${values.length}`);
+  }
+
+  if (search) {
+    values.push(`%${search}%`);
+    conditions.push(`
+      (
+        u.nombres ILIKE $${values.length}
+        OR u.apellidos ILIKE $${values.length}
+        OR u.dni ILIKE $${values.length}
+        OR e.codigo_estudiante ILIKE $${values.length}
+      )
+    `);
+  }
+
+  if (grado) {
+    values.push(grado);
+    conditions.push(`g.nombre = $${values.length}`);
+  }
+
+  if (aula_id) {
+    values.push(aula_id);
+    conditions.push(`a.id = $${values.length}`);
+  }
+
+  if (turno) {
+    values.push(turno);
+    conditions.push(`a.turno = $${values.length}`);
+  }
+
+  const whereClause = conditions.length > 0
+    ? `WHERE ${conditions.join(' AND ')}`
+    : '';
+
+  const query = `
+    WITH latest_matricula AS (
+      SELECT DISTINCT ON (m.estudiante_id)
+        m.id,
+        m.estudiante_id,
+        m.aula_id,
+        m.periodo_id,
+        m.estado,
+        m.fecha,
+        m.created_at
+      FROM matriculas m
+      WHERE m.estado = 'aprobado'
+      ORDER BY m.estudiante_id, m.created_at DESC, m.id DESC
+    )
+    SELECT
+      e.id AS estudiante_id,
+      e.user_id,
+      e.codigo_estudiante,
+      e.fecha_nacimiento,
+      e.direccion,
+      e.estado,
+      u.nombres,
+      u.apellidos,
+      u.dni,
+      u.username,
+      u.correo,
+      u.telefono,
+
+      lm.id AS matricula_id,
+      lm.estado AS matricula_estado,
+      lm.periodo_id,
+      lm.fecha AS fecha_matricula,
+
+      a.id AS aula_id,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      a.turno,
+
+      COALESCE(
+        JSON_AGG(
+          DISTINCT JSONB_BUILD_OBJECT(
+            'relacion_id', ea.id,
+            'parentesco', ea.parentesco,
+            'apoderado_id', ap.id,
+            'nombres', uap.nombres,
+            'apellidos', uap.apellidos,
+            'dni', uap.dni,
+            'telefono', uap.telefono,
+            'correo', uap.correo
+          )
+        ) FILTER (WHERE ap.id IS NOT NULL),
+        '[]'
+      ) AS apoderados
+
+    FROM estudiantes e
+    INNER JOIN users u
+      ON e.user_id = u.id
+
+    LEFT JOIN latest_matricula lm
+      ON lm.estudiante_id = e.id
+    LEFT JOIN aulas a
+      ON lm.aula_id = a.id
+    LEFT JOIN grados g
+      ON a.grado_id = g.id
+    LEFT JOIN secciones s
+      ON a.seccion_id = s.id
+
+    LEFT JOIN estudiante_apoderado ea
+      ON ea.estudiante_id = e.id
+    LEFT JOIN apoderados ap
+      ON ea.apoderado_id = ap.id
+    LEFT JOIN users uap
+      ON ap.user_id = uap.id
+
+    ${whereClause}
+
+    GROUP BY
+      e.id,
+      e.user_id,
+      e.codigo_estudiante,
+      e.fecha_nacimiento,
+      e.direccion,
+      e.estado,
+      u.nombres,
+      u.apellidos,
+      u.dni,
+      u.username,
+      u.correo,
+      u.telefono,
+      lm.id,
+      lm.estado,
+      lm.periodo_id,
+      lm.fecha,
+      a.id,
+      g.nombre,
+      s.nombre,
+      a.turno
+
+    ORDER BY
+      g.nombre ASC NULLS LAST,
+      s.nombre ASC NULLS LAST,
+      a.turno ASC NULLS LAST,
+      u.apellidos ASC,
+      u.nombres ASC
+  `;
+
+  const result = await pool.query(query, values);
+  return result.rows;
+};
