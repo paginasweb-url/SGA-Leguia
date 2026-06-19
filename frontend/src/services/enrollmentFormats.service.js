@@ -108,6 +108,10 @@ export const downloadEnrollmentFormat = async ({
   id,
   fallbackFileName = 'formato_matricula.pdf'
 }) => {
+  if (!id) {
+    throw new Error('No se encontró el ID del formato para descargar');
+  }
+
   const response = await api.get(`/enrollment-formats/${id}/download`, {
     responseType: 'blob'
   });

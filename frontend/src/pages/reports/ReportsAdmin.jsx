@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle,
   BarChart3,
   Bell,
   BookOpen,
@@ -13,6 +12,8 @@ import {
   ShieldAlert,
   Users
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import {
   exportAnnouncementsReport,
@@ -70,9 +71,9 @@ const REPORT_CONFIG = {
     description: 'Estudiantes con nota C por bimestre.'
   },
   announcements: {
-    label: 'Comunicados',
+    label: 'Avisos',
     icon: Bell,
-    description: 'Reporte de comunicados y confirmaciones de lectura.'
+    description: 'Reporte de avisos y confirmaciones de lectura.'
   }
 };
 
@@ -111,6 +112,33 @@ function formatValue(value) {
   }
 
   return String(value);
+}
+
+function shouldLimitPreview(activeReport, column) {
+  const normalizedColumn = String(column || '').toLowerCase();
+
+  return (
+    activeReport === 'announcements' &&
+    ['contenido', 'content', 'mensaje', 'descripcion'].includes(normalizedColumn)
+  );
+}
+
+function formatPreviewValue(value, activeReport, column) {
+  const formatted = formatValue(value);
+
+  if (!shouldLimitPreview(activeReport, column)) {
+    return formatted;
+  }
+
+  if (formatted === 'No precisa') {
+    return formatted;
+  }
+
+  const maxLength = 90;
+
+  return formatted.length > maxLength
+    ? `${formatted.slice(0, maxLength)}...`
+    : formatted;
 }
 
 function ReportsAdmin() {
@@ -192,6 +220,13 @@ function ReportsAdmin() {
     loadReport();
   }, [activeReport]);
 
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
   const handleExport = async () => {
     try {
       setError('');
@@ -219,6 +254,9 @@ function ReportsAdmin() {
       if (activeReport === 'announcements') {
         await exportAnnouncementsReport();
       }
+
+      toast.success('Reporte exportado correctamente.');
+
     } catch (error) {
       setError(
         error?.response?.data?.error ||
@@ -295,13 +333,6 @@ function ReportsAdmin() {
           </div>
         </div>
       </section>
-
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">{error}</p>
-        </div>
-      )}
 
       <section className="grid grid-cols-1 md:grid-cols-4 gap-5">
         {counters.map(([label, value]) => (
@@ -514,20 +545,43 @@ function GenericReportTable({ rows, activeReport }) {
 
           <tbody className="divide-y divide-slate-100">
             {rows.map((row, index) => (
-              <tr key={`${activeReport}-${index}`} className="hover:bg-slate-50 transition">
-                {columns.map((column) => (
-                  <td
-                    key={column}
-                    className="px-5 py-4 text-slate-700 whitespace-nowrap"
-                  >
-                    {formatValue(row[column])}
-                  </td>
-                ))}
+              <tr
+                key={`${activeReport}-${index}`}
+                className="hover:bg-slate-50 transition"
+              >
+                {columns.map((column) => {
+                  const limited = shouldLimitPreview(activeReport, column);
+                  const fullValue = formatValue(row[column]);
+                  const previewValue = formatPreviewValue(row[column], activeReport, column);
+
+                  return (
+                    <td
+                      key={column}
+                      title={limited ? fullValue : undefined}
+                      className={`px-5 py-4 text-slate-700 align-top ${
+                        limited
+                          ? 'min-w-[280px] max-w-[420px] whitespace-normal break-words leading-relaxed'
+                          : 'whitespace-nowrap'
+                      }`}
+                    >
+                      {previewValue}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {activeReport === 'announcements' && (
+        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50">
+          <p className="text-xs text-slate-500">
+            La vista previa limita el contenido largo para mantener la tabla ordenada.
+            El archivo Excel se exporta con la información completa.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

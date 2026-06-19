@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle,
   Bell,
   CalendarDays,
-  CheckCircle2,
   Clock,
   LayoutGrid,
   Loader2,
   RefreshCw,
   UserRoundCheck
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import { getMySchedules } from '../../services/schedules.service';
 import { getRole, getStoredUser } from '../../utils/storage';
@@ -59,6 +59,13 @@ function MySchedule() {
   useEffect(() => {
     loadSchedules();
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
 
   const students = useMemo(() => {
     const map = new Map();
@@ -149,15 +156,6 @@ function MySchedule() {
           </button>
         </div>
       </section>
-
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">
-            {error}
-          </p>
-        </div>
-      )}
 
       {role === 'Apoderado' && students.length > 1 && (
         <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5">

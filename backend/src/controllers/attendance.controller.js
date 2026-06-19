@@ -2,6 +2,7 @@ import {
   getStudentsByClassroom,
   saveClassroomAttendance,
   getAttendanceByClassroomAndDate,
+  getAttendanceByClassroomRange,
   getAttendanceByStudent,
   getAttendanceSummaryByClassroom,
   getActiveClassroomsForAttendance,
@@ -71,6 +72,50 @@ export const registerClassroomAttendance = async (req, res) => {
   } catch (error) {
     console.error(error);
 
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getClassroomAttendanceByRange = async (req, res) => {
+  try {
+    const { aulaId } = req.params;
+    const { fechaInicio, fechaFin } = req.query;
+
+    if (!fechaInicio || !fechaFin) {
+      return res.status(400).json({
+        success: false,
+        error: 'La fecha de inicio y la fecha fin son obligatorias'
+      });
+    }
+
+    if (fechaInicio > fechaFin) {
+      return res.status(400).json({
+        success: false,
+        error: 'La fecha de inicio no puede ser mayor que la fecha fin'
+      });
+    }
+
+    const result = await getAttendanceByClassroomRange({
+      aulaId,
+      fechaInicio,
+      fechaFin
+    });
+
+    res.json({
+      success: true,
+      filters: {
+        aulaId,
+        fechaInicio,
+        fechaFin
+      },
+      data: result.records,
+      summary: result.summary
+    });
+
+  } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message
@@ -175,9 +220,13 @@ export const getAttendanceClassrooms = async (req, res) => {
 
 export const getMyAttendance = async (req, res) => {
   try {
+    const { fechaInicio, fechaFin } = req.query;
+
     const attendance = await getAttendanceForUser({
       userId: req.user.id,
-      rol: req.user.rol
+      rol: req.user.rol,
+      fechaInicio,
+      fechaFin
     });
 
     res.json({

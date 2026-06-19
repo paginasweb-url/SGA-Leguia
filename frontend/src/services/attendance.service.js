@@ -45,7 +45,25 @@ export const getStudentAttendance = async (studentId) => {
   return response.data;
 };
 
-export const getMyAttendance = async () => {
-  const response = await api.get('/attendance/me');
+export const getMyAttendance = async (params = {}) => {
+  const response = await api.get('/attendance/me', {
+    params
+  });
+
+  return response.data;
+};
+
+export const getClassroomAttendanceByRange = async ({
+  aulaId,
+  fechaInicio,
+  fechaFin
+}) => {
+  const response = await api.get(`/attendance/classroom/${aulaId}/range`, {
+    params: {
+      fechaInicio,
+      fechaFin
+    }
+  });
+
   return response.data;
 };

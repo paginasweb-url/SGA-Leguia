@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -8,8 +7,11 @@ import {
   Loader2,
   RefreshCw,
   UserCheck,
+  X,
   XCircle
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import { getMyAttendance } from '../../services/attendance.service';
 import { getRole, getStoredUser } from '../../utils/storage';
@@ -44,9 +46,40 @@ function MyAttendance() {
   const [attendance, setAttendance] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState('todos');
 
+  const [filterMode, setFilterMode] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
+  const [selectedAttendanceDetail, setSelectedAttendanceDetail] = useState(null);
+
+  const getAttendanceQueryParams = () => {
+    if (filterMode === 'month') {
+      return {
+        fechaInicio: getMonthStart(),
+        fechaFin: getToday()
+      };
+    }
+
+    if (filterMode === 'last30') {
+      return {
+        fechaInicio: getDaysAgo(30),
+        fechaFin: getToday()
+      };
+    }
+
+    if (filterMode === 'custom') {
+      return {
+        fechaInicio: dateFrom || undefined,
+        fechaFin: dateTo || undefined
+      };
+    }
+
+    return {};
+  };
 
   const loadAttendance = async ({ silent = false } = {}) => {
     try {
@@ -58,7 +91,12 @@ function MyAttendance() {
         setLoading(true);
       }
 
-      const response = await getMyAttendance();
+      if (filterMode === 'custom' && dateFrom && dateTo && dateFrom > dateTo) {
+        setError('La fecha de inicio no puede ser mayor que la fecha fin.');
+        return;
+      }
+
+      const response = await getMyAttendance(getAttendanceQueryParams());
       setAttendance((response.data || []).filter((item) => item.fecha));
     } catch (error) {
       setError(
@@ -73,7 +111,14 @@ function MyAttendance() {
 
   useEffect(() => {
     loadAttendance();
-  }, []);
+  }, [filterMode, dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
 
   const students = useMemo(() => {
     const map = new Map();
@@ -89,6 +134,18 @@ function MyAttendance() {
       name
     }));
   }, [attendance]);
+
+  useEffect(() => {
+    if (selectedStudent === 'todos') return;
+
+    const exists = students.some(
+      (student) => Number(student.id) === Number(selectedStudent)
+    );
+
+    if (!exists) {
+      setSelectedStudent('todos');
+    }
+  }, [students, selectedStudent]);
 
   const visibleAttendance = useMemo(() => {
     if (selectedStudent === 'todos') return attendance;
@@ -132,7 +189,9 @@ function MyAttendance() {
       .map(([key, items]) => ({
         key,
         label: formatMonth(key),
-        items: items.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+        items: items.sort((a, b) =>
+          getDateOnly(a.fecha).localeCompare(getDateOnly(b.fecha))
+        )
       }))
       .sort((a, b) => b.key.localeCompare(a.key));
   }, [visibleAttendance]);
@@ -188,37 +247,80 @@ function MyAttendance() {
         </div>
       </section>
 
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">
-            {error}
-          </p>
-        </div>
-      )}
-
-      {role === 'Apoderado' && students.length > 1 && (
-        <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5">
-          <label className="block">
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <label className={`${filterMode === 'custom' ? 'lg:col-span-3' : 'lg:col-span-4'} block`}>
             <span className="block text-sm font-bold text-slate-700 mb-2">
-              Estudiante
+              Periodo
             </span>
 
             <select
-              value={selectedStudent}
-              onChange={(e) => setSelectedStudent(e.target.value)}
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
             >
-              <option value="todos">Todos los estudiantes vinculados</option>
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.name}
-                </option>
-              ))}
+              <option value="all">Todo el historial</option>
+              <option value="month">Este mes</option>
+              <option value="last30">Últimos 30 días</option>
+              <option value="custom">Rango personalizado</option>
             </select>
           </label>
-        </section>
-      )}
+
+          {filterMode === 'custom' && (
+            <>
+              <label className="lg:col-span-3 block">
+                <span className="block text-sm font-bold text-slate-700 mb-2">
+                  Desde
+                </span>
+
+                <input
+                  type="date"
+                  value={dateFrom}
+                  max={getToday()}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+                />
+              </label>
+
+              <label className="lg:col-span-3 block">
+                <span className="block text-sm font-bold text-slate-700 mb-2">
+                  Hasta
+                </span>
+
+                <input
+                  type="date"
+                  value={dateTo}
+                  max={getToday()}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+                />
+              </label>
+            </>
+          )}
+
+          {role === 'Apoderado' && students.length > 1 && (
+            <label className={`${filterMode === 'custom' ? 'lg:col-span-3' : 'lg:col-span-4'} block`}>
+              <span className="block text-sm font-bold text-slate-700 mb-2">
+                Estudiante
+              </span>
+
+              <select
+                value={selectedStudent}
+                onChange={(e) => setSelectedStudent(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+              >
+                <option value="todos">Todos mis hijos</option>
+
+                {students.map((student) => (
+                  <option key={student.id} value={student.id}>
+                    {student.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      </section>
 
       <section className="grid grid-cols-1 md:grid-cols-5 gap-5">
         <CounterCard icon={CalendarDays} label="Registros" value={summary.total} description="Asistencias registradas" />
@@ -252,6 +354,7 @@ function MyAttendance() {
               key={month.key}
               month={month}
               role={role}
+              onOpenDetail={setSelectedAttendanceDetail}
             />
           ))}
         </section>
@@ -268,11 +371,91 @@ function MyAttendance() {
           </p>
         </section>
       )}
+      {selectedAttendanceDetail && (
+        <AttendanceDetailModal
+          item={selectedAttendanceDetail}
+          role={role}
+          onClose={() => setSelectedAttendanceDetail(null)}
+        />
+      )}
     </main>
   );
 }
 
-function MonthBlock({ month, role }) {
+function AttendanceDetailModal({ item, role, onClose }) {
+  const config = stateConfig[item.estado] || stateConfig.presente;
+  const Icon = config.icon;
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <section className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="flex items-start gap-4 pr-10">
+          <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 ${config.className}`}>
+            <Icon size={24} />
+          </div>
+
+          <div>
+            <p className="text-sm font-extrabold text-slate-500 uppercase tracking-[0.16em]">
+              Detalle de asistencia
+            </p>
+
+            <h2 className="text-2xl font-extrabold text-brand-950 mt-1 capitalize">
+              {item.estado || 'Sin estado'}
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              {formatLongDate(item.fecha)}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          {item.estudiante && (
+            <DetailRow label="Estudiante" value={item.estudiante} />
+          )}
+
+          <DetailRow label="Estado" value={config.label} />
+          <DetailRow label="Fecha" value={formatLongDate(item.fecha)} />
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+              Observación
+            </p>
+
+            <p className="text-sm text-brand-950 mt-2 leading-relaxed">
+              {item.observacion?.trim() || 'Sin observación registrada.'}
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border border-slate-200 rounded-2xl p-4">
+      <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+        {label}
+      </span>
+
+      <span className="text-sm font-bold text-brand-950 text-right">
+        {value || 'No precisa'}
+      </span>
+    </div>
+  );
+}
+
+function MonthBlock({ month, role, onOpenDetail }) {
   return (
     <div className="bg-blue-50/50 border border-blue-100 rounded-3xl shadow-soft p-5">
       <h3 className="text-lg font-extrabold text-brand-950 capitalize">
@@ -285,6 +468,7 @@ function MonthBlock({ month, role }) {
             key={`${item.id}-${item.fecha}-${item.estudiante_id || 'me'}`}
             item={item}
             role={role}
+            onClick={() => onOpenDetail(item)}
           />
         ))}
       </div>
@@ -292,12 +476,21 @@ function MonthBlock({ month, role }) {
   );
 }
 
-function AttendanceDayCard({ item, role }) {
+function AttendanceDayCard({ item, role, onClick }) {
   const config = stateConfig[item.estado] || stateConfig.presente;
   const Icon = config.icon;
+  const hasObservation = Boolean(String(item.observacion || '').trim());
 
   return (
-    <div className="w-[88px] bg-white border border-slate-200 rounded-xl shadow-sm p-3 text-center hover:-translate-y-1 hover:shadow-md transition">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-[88px] bg-white border border-slate-200 rounded-xl shadow-sm p-3 text-center hover:-translate-y-1 hover:shadow-md transition relative"
+    >
+      {hasObservation && (
+        <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-gold-500 border-2 border-white" />
+      )}
+
       <p className="text-xs font-bold text-brand-950">
         {formatShortDate(item.fecha)}
       </p>
@@ -315,7 +508,7 @@ function AttendanceDayCard({ item, role }) {
           {item.estudiante}
         </p>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -430,6 +623,38 @@ function formatShortDate(value) {
     weekday: 'short',
     day: '2-digit'
   });
+}
+
+function formatLongDate(value) {
+  const dateOnly = getDateOnly(value);
+
+  if (!dateOnly) return 'Sin fecha';
+
+  return new Date(`${dateOnly}T00:00:00`).toLocaleDateString('es-PE', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+function getToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getMonthStart() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+
+  return `${year}-${month}-01`;
+}
+
+function getDaysAgo(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+
+  return date.toISOString().slice(0, 10);
 }
 
 export default MyAttendance;

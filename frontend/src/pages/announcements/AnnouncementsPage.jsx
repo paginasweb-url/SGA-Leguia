@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertCircle,
   Bell,
   CheckCircle2,
   ClipboardCheck,
@@ -14,6 +13,8 @@ import {
   X
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 import {
   createAnnouncement,
   getAllAnnouncements,
@@ -25,6 +26,8 @@ import {
 import { getRole, getStoredUser } from '../../utils/storage';
 import { getClassrooms } from '../../services/classrooms.service';
 import { getTeacherDashboardReport } from '../../services/dashboard.service';
+
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const targetLabels = {
   general: 'General',
@@ -58,6 +61,8 @@ const targetOptionsTeacher = [
 ];
 
 function AnnouncementsPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const role = getRole();
   const user = getStoredUser();
 
@@ -66,6 +71,7 @@ function AnnouncementsPage() {
 
   const [announcements, setAnnouncements] = useState([]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [readSummary, setReadSummary] = useState(null);
   const [classroomOptions, setClassroomOptions] = useState([]);
   const [loadingClassrooms, setLoadingClassrooms] = useState(false);
@@ -91,6 +97,26 @@ function AnnouncementsPage() {
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [adminReadCounters, setAdminReadCounters] = useState({
+    totalConfirmaciones: 0,
+    totalLeidos: 0,
+    totalPendientes: 0
+  });
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
     const loadClassroomOptions = async () => {
     if (!canCreate) return;
@@ -145,6 +171,56 @@ function AnnouncementsPage() {
     }
   };
 
+  const loadAdminReadCounters = async (items = []) => {
+    if (!isAdminView || items.length === 0) {
+      setAdminReadCounters({
+        totalConfirmaciones: 0,
+        totalLeidos: 0,
+        totalPendientes: 0
+      });
+      return;
+    }
+
+    try {
+      const summaries = await Promise.all(
+        items.map(async (item) => {
+          try {
+            const response = await getAnnouncementReadSummary(item.id);
+            return response.data || {};
+          } catch {
+            return {};
+          }
+        })
+      );
+
+      const totals = summaries.reduce(
+        (acc, item) => {
+          const confirmaciones = Number(item.total_confirmaciones || 0);
+          const leidos = Number(item.total_leidos || 0);
+
+          acc.totalConfirmaciones += confirmaciones;
+          acc.totalLeidos += leidos;
+          acc.totalPendientes += Math.max(confirmaciones - leidos, 0);
+
+          return acc;
+        },
+        {
+          totalConfirmaciones: 0,
+          totalLeidos: 0,
+          totalPendientes: 0
+        }
+      );
+
+      setAdminReadCounters(totals);
+    } catch {
+      setAdminReadCounters({
+        totalConfirmaciones: 0,
+        totalLeidos: 0,
+        totalPendientes: 0
+      });
+    }
+  };
+
   const loadAnnouncements = async ({ silent = false } = {}) => {
     try {
       setError('');
@@ -159,11 +235,17 @@ function AnnouncementsPage() {
         ? await getAllAnnouncements()
         : await getMyAnnouncements();
 
-      setAnnouncements(response.data || []);
+      const data = response.data || [];
+
+      setAnnouncements(data);
+
+      if (isAdminView) {
+        await loadAdminReadCounters(data);
+      }
     } catch (error) {
       setError(
         error?.response?.data?.error ||
-        'No se pudieron cargar los comunicados.'
+        'No se pudieron cargar los avisos.'
       );
     } finally {
       setLoading(false);
@@ -234,6 +316,25 @@ function AnnouncementsPage() {
     }
   };
 
+  useEffect(() => {
+    const openAnnouncementId = location.state?.openAnnouncementId;
+
+    if (!openAnnouncementId || announcements.length === 0) return;
+
+    const announcementToOpen = announcements.find(
+      (item) => Number(item.id) === Number(openAnnouncementId)
+    );
+
+    if (!announcementToOpen) return;
+
+    handleSelectAnnouncement(announcementToOpen);
+
+    navigate(location.pathname, {
+      replace: true,
+      state: {}
+    });
+  }, [location.state, announcements]);
+
   const handleMarkAsRead = async (announcement) => {
     if (!announcement?.id || announcement.leido) return;
 
@@ -288,7 +389,7 @@ function AnnouncementsPage() {
       }
 
       if (form.destinatario_tipo === 'aula' && !form.aula_id) {
-        setError('Selecciona un aula para publicar el comunicado.');
+        setError('Selecciona un aula para publicar el aviso.');
         return;
       }
 
@@ -301,7 +402,7 @@ function AnnouncementsPage() {
         aula_id: form.destinatario_tipo === 'aula' ? form.aula_id : undefined
       });
 
-      setSuccessMessage(response.message || 'Comunicado publicado correctamente.');
+      setSuccessMessage(response.message || 'Aviso publicado correctamente.');
 
       setForm({
         titulo: '',
@@ -310,15 +411,30 @@ function AnnouncementsPage() {
         aula_id: ''
       });
 
+      setShowCreateModal(false);
+
       await loadAnnouncements({ silent: true });
     } catch (error) {
       setError(
         error?.response?.data?.error ||
-        'No se pudo publicar el comunicado.'
+        'No se pudo publicar el aviso.'
       );
     } finally {
       setCreating(false);
     }
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    setError('');
+    setSuccessMessage('');
+  };
+
+  const closeDetailModal = () => {
+    setSelectedAnnouncement(null);
+    setReadSummary(null);
+    setError('');
+    setSuccessMessage('');
   };
 
   const targetOptions = role === 'Docente'
@@ -331,7 +447,7 @@ function AnnouncementsPage() {
         <div className="text-center">
           <Loader2 className="mx-auto animate-spin text-brand-900" size={36} />
           <p className="mt-4 text-sm font-semibold text-slate-500">
-            Cargando comunicados...
+            Cargando avisos...
           </p>
         </div>
       </div>
@@ -346,17 +462,17 @@ function AnnouncementsPage() {
         <div className="relative flex flex-col xl:flex-row xl:items-end xl:justify-between gap-6">
           <div>
             <p className="text-sm font-extrabold text-gold-500 uppercase tracking-[0.2em]">
-              Comunicaciones institucionales
+              Avisos institucionales
             </p>
 
             <h1 className="text-3xl lg:text-4xl font-extrabold mt-3">
-              Comunicados
+              Avisos
             </h1>
 
             <p className="text-blue-100 mt-3 max-w-2xl">
               {isAdminView
-                ? 'Publica comunicados y revisa confirmaciones de lectura.'
-                : 'Consulta los comunicados dirigidos a tu rol o aula vinculada.'}
+                ? 'Publica avisos y revisa confirmaciones de lectura.'
+                : 'Consulta los avisos dirigidos a tu rol o aula vinculada.'}
             </p>
 
             <p className="text-sm text-blue-100 mt-4">
@@ -376,176 +492,32 @@ function AnnouncementsPage() {
         </div>
       </section>
 
-      {error && (
-        <MessageBox type="error" message={error} onClose={() => setError('')} />
-      )}
-
-      {successMessage && (
-        <MessageBox type="success" message={successMessage} onClose={() => setSuccessMessage('')} />
-      )}
-
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <CounterCard
           icon={Megaphone}
           label="Total"
           value={counters.total}
-          description="Comunicados disponibles"
+          description="Avisos disponibles"
         />
 
         <CounterCard
           icon={Bell}
           label="Pendientes"
-          value={isAdminView ? '—' : counters.pendientes}
-          description={isAdminView ? 'Consulta por comunicado' : 'Aún no confirmados'}
+          value={isAdminView ? adminReadCounters.totalPendientes : counters.pendientes}
+          description={isAdminView ? 'Lecturas pendientes' : 'Aún no confirmados'}
         />
 
         <CounterCard
           icon={ClipboardCheck}
           label="Leídos"
-          value={isAdminView ? '—' : counters.leidos}
-          description={isAdminView ? 'Resumen en detalle' : 'Confirmados por tu usuario'}
+          value={isAdminView ? adminReadCounters.totalLeidos : counters.leidos}
+          description={isAdminView ? 'Lecturas confirmadas' : 'Confirmados por tu usuario'}
         />
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        <div className="xl:col-span-5 space-y-5">
-          {canCreate && (
-            <form
-              onSubmit={handleCreate}
-              className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
-                  <Send size={22} />
-                </div>
-
-                <div>
-                  <h2 className="text-xl font-extrabold text-brand-950">
-                    Publicar comunicado
-                  </h2>
-
-                  <p className="text-sm text-slate-500">
-                    El comunicado será visible para el destinatario seleccionado.
-                  </p>
-                </div>
-              </div>
-
-              <Input
-                label="Título"
-                value={form.titulo}
-                onChange={(value) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    titulo: value
-                  }))
-                }
-                placeholder="Ej. Suspensión de clases"
-              />
-
-              <label className="block">
-                <span className="block text-sm font-bold text-slate-700 mb-2">
-                  Destinatario
-                </span>
-
-                <select
-                  value={form.destinatario_tipo}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      destinatario_tipo: e.target.value,
-                      aula_id: e.target.value === 'aula' ? prev.aula_id : ''
-                    }))
-                  }
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                >
-                  {targetOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {form.destinatario_tipo === 'aula' && (
-                <label className="block">
-                  <span className="block text-sm font-bold text-slate-700 mb-2">
-                    Aula
-                  </span>
-
-                  <select
-                    value={form.aula_id}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        aula_id: e.target.value
-                      }))
-                    }
-                    disabled={loadingClassrooms || classroomOptions.length === 0}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800 disabled:opacity-60"
-                  >
-                    <option value="">
-                      {loadingClassrooms
-                        ? 'Cargando aulas...'
-                        : classroomOptions.length > 0
-                          ? 'Selecciona un aula'
-                          : 'No hay aulas disponibles'}
-                    </option>
-
-                    {classroomOptions.map((classroom) => (
-                      <option key={classroom.id} value={classroom.id}>
-                        {classroom.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  {role === 'Docente' && (
-                    <p className="text-xs text-slate-500 mt-2">
-                      Solo se muestran las aulas asignadas a tu usuario docente.
-                    </p>
-                  )}
-                </label>
-              )}
-
-              <label className="block">
-                <span className="block text-sm font-bold text-slate-700 mb-2">
-                  Contenido
-                </span>
-
-                <textarea
-                  value={form.contenido}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      contenido: e.target.value
-                    }))
-                  }
-                  rows={5}
-                  placeholder="Escribe el comunicado..."
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800 resize-none"
-                />
-              </label>
-
-              <button
-                type="submit"
-                disabled={creating}
-                className="w-full inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-800 disabled:opacity-60 transition"
-              >
-                {creating ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Plus size={18} />
-                )}
-                Publicar comunicado
-              </button>
-
-            </form>
-          )}
-
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5 space-y-4">
-            <h2 className="text-lg font-extrabold text-brand-950">
-              Filtros
-            </h2>
-
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5">
+        <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 flex-1">
             <Input
               label="Buscar"
               value={filters.search}
@@ -607,54 +579,247 @@ function AnnouncementsPage() {
               </label>
             )}
           </div>
-        </div>
 
-        <div className="xl:col-span-7 space-y-5">
-          <div className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
-            <div className="p-6 border-b border-slate-100">
-              <h2 className="text-xl font-extrabold text-brand-950">
-                Listado de comunicados
-              </h2>
-
-              <p className="text-sm text-slate-500 mt-1">
-                {isAdminView
-                  ? 'Comunicados publicados en el sistema.'
-                  : 'Comunicados disponibles para tu usuario.'}
-              </p>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {filteredAnnouncements.length > 0 ? (
-                filteredAnnouncements.map((item) => (
-                  <AnnouncementItem
-                    key={item.id}
-                    item={item}
-                    isAdminView={isAdminView}
-                    active={selectedAnnouncement?.id === item.id}
-                    marking={markingId === item.id}
-                    onSelect={() => handleSelectAnnouncement(item)}
-                    onMarkRead={() => handleMarkAsRead(item)}
-                  />
-                ))
-              ) : (
-                <EmptyBlock text="No se encontraron comunicados." />
-              )}
-            </div>
-          </div>
-
-          {selectedAnnouncement && (
-            <AnnouncementDetail
-              announcement={selectedAnnouncement}
-              isAdminView={isAdminView}
-              readSummary={readSummary}
-              loadingSummary={loadingSummary}
-              onMarkRead={() => handleMarkAsRead(selectedAnnouncement)}
-              marking={markingId === selectedAnnouncement.id}
-            />
+          {canCreate && (
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center justify-center gap-2 bg-brand-950 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-900 transition"
+            >
+              <Plus size={18} />
+              Nuevo aviso
+            </button>
           )}
         </div>
       </section>
+
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-extrabold text-brand-950">
+              Listado de avisos
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              {isAdminView
+                ? 'Avisos publicados en el sistema.'
+                : 'Avisos disponibles para tu usuario.'}
+            </p>
+          </div>
+
+          <span className="hidden sm:inline-flex rounded-full px-3 py-1 text-xs font-extrabold bg-brand-50 text-brand-900 border border-brand-100">
+            {filteredAnnouncements.length} resultado(s)
+          </span>
+        </div>
+
+        <div className="divide-y divide-slate-100 max-h-[calc(100vh-390px)] min-h-[420px] overflow-y-auto">
+          {filteredAnnouncements.length > 0 ? (
+            filteredAnnouncements.map((item) => (
+              <AnnouncementItem
+                key={item.id}
+                item={item}
+                isAdminView={isAdminView}
+                active={selectedAnnouncement?.id === item.id}
+                marking={markingId === item.id}
+                onSelect={() => handleSelectAnnouncement(item)}
+                onMarkRead={() => handleMarkAsRead(item)}
+              />
+            ))
+          ) : (
+            <EmptyBlock text="No se encontraron avisos." />
+          )}
+        </div>
+      </section>
+
+      {showCreateModal && (
+        <AnnouncementModal onClose={closeCreateModal}>
+          <AnnouncementCreateForm
+            form={form}
+            role={role}
+            targetOptions={targetOptions}
+            classroomOptions={classroomOptions}
+            loadingClassrooms={loadingClassrooms}
+            creating={creating}
+            setForm={setForm}
+            onSubmit={handleCreate}
+          />
+        </AnnouncementModal>
+      )}
+
+      {selectedAnnouncement && (
+        <AnnouncementModal onClose={closeDetailModal}>
+          <AnnouncementDetail
+            announcement={selectedAnnouncement}
+            isAdminView={isAdminView}
+            readSummary={readSummary}
+            loadingSummary={loadingSummary}
+            onMarkRead={() => handleMarkAsRead(selectedAnnouncement)}
+            marking={markingId === selectedAnnouncement.id}
+          />
+        </AnnouncementModal>
+      )}
     </main>
+  );
+}
+
+function AnnouncementModal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-6">
+      <section className="relative w-full lg:max-w-4xl max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function AnnouncementCreateForm({
+  form,
+  role,
+  targetOptions,
+  classroomOptions,
+  loadingClassrooms,
+  creating,
+  setForm,
+  onSubmit
+}) {
+  return (
+    <form
+      onSubmit={onSubmit}
+      className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
+    >
+      <div className="flex items-center gap-3 pr-10">
+        <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
+          <Send size={22} />
+        </div>
+
+        <div>
+          <h2 className="text-xl font-extrabold text-brand-950">
+            Publicar aviso
+          </h2>
+
+          <p className="text-sm text-slate-500">
+            El aviso será visible para el destinatario seleccionado.
+          </p>
+        </div>
+      </div>
+
+      <Input
+        label="Título"
+        value={form.titulo}
+        onChange={(value) =>
+          setForm((prev) => ({
+            ...prev,
+            titulo: value
+          }))
+        }
+        placeholder="Ej. Suspensión de clases"
+      />
+
+      <label className="block">
+        <span className="block text-sm font-bold text-slate-700 mb-2">
+          Destinatario
+        </span>
+
+        <select
+          value={form.destinatario_tipo}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              destinatario_tipo: e.target.value,
+              aula_id: e.target.value === 'aula' ? prev.aula_id : ''
+            }))
+          }
+          className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+        >
+          {targetOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {form.destinatario_tipo === 'aula' && (
+        <label className="block">
+          <span className="block text-sm font-bold text-slate-700 mb-2">
+            Aula
+          </span>
+
+          <select
+            value={form.aula_id}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                aula_id: e.target.value
+              }))
+            }
+            disabled={loadingClassrooms || classroomOptions.length === 0}
+            className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800 disabled:opacity-60"
+          >
+            <option value="">
+              {loadingClassrooms
+                ? 'Cargando aulas...'
+                : classroomOptions.length > 0
+                  ? 'Selecciona un aula'
+                  : 'No hay aulas disponibles'}
+            </option>
+
+            {classroomOptions.map((classroom) => (
+              <option key={classroom.id} value={classroom.id}>
+                {classroom.label}
+              </option>
+            ))}
+          </select>
+
+          {role === 'Docente' && (
+            <p className="text-xs text-slate-500 mt-2">
+              Solo se muestran las aulas asignadas a tu usuario docente.
+            </p>
+          )}
+        </label>
+      )}
+
+      <label className="block">
+        <span className="block text-sm font-bold text-slate-700 mb-2">
+          Contenido
+        </span>
+
+        <textarea
+          value={form.contenido}
+          onChange={(e) =>
+            setForm((prev) => ({
+              ...prev,
+              contenido: e.target.value
+            }))
+          }
+          rows={7}
+          placeholder="Escribe el aviso..."
+          className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800 resize-none"
+        />
+      </label>
+
+      <button
+        type="submit"
+        disabled={creating}
+        className="w-full inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-800 disabled:opacity-60 transition"
+      >
+        {creating ? (
+          <Loader2 size={18} className="animate-spin" />
+        ) : (
+          <Plus size={18} />
+        )}
+        Publicar aviso
+      </button>
+    </form>
   );
 }
 
@@ -679,7 +844,7 @@ function AnnouncementItem({
         >
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-extrabold text-brand-950">
-              {item.titulo || 'Comunicado'}
+              {item.titulo || 'Aviso'}
             </p>
 
             <span className="inline-flex rounded-full px-3 py-1 text-xs font-extrabold bg-slate-50 border border-slate-200 text-slate-600">
@@ -744,10 +909,10 @@ function AnnouncementDetail({
 }) {
   return (
     <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 pr-10">
         <div>
           <p className="text-sm font-extrabold text-gold-600 uppercase tracking-[0.16em]">
-            Detalle del comunicado
+            Detalle del aviso
           </p>
 
           <h2 className="text-2xl font-extrabold text-brand-950 mt-2">
@@ -757,6 +922,12 @@ function AnnouncementDetail({
           <p className="text-sm text-slate-500 mt-2">
             {formatTarget(announcement)} · {formatDateTime(announcement.fecha || announcement.created_at)}
           </p>
+
+          {announcement.publicado_por_nombre && (
+            <p className="text-sm text-slate-500 mt-1">
+              Publicado por {announcement.publicado_por_nombre}
+            </p>
+          )}
         </div>
 
         {!isAdminView && !announcement.leido && (
@@ -778,9 +949,21 @@ function AnnouncementDetail({
 
       <div className="mt-6 bg-slate-50 border border-slate-100 rounded-2xl p-5">
         <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
-          {announcement.contenido}
+          {announcement.contenido || 'Sin contenido adicional.'}
         </p>
       </div>
+
+      {!isAdminView && (
+        <div className="mt-5 border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+          <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+            Estado de lectura
+          </span>
+
+          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold border ${announcement.leido ? readStyles.leido : readStyles.pendiente}`}>
+            {announcement.leido ? 'Leído' : 'Pendiente'}
+          </span>
+        </div>
+      )}
 
       {isAdminView && (
         <div className="mt-5 bg-brand-950 text-white rounded-2xl p-5">
@@ -795,7 +978,7 @@ function AnnouncementDetail({
               </h3>
 
               <p className="text-sm text-blue-100">
-                Resumen registrado en comunicado_lecturas.
+                Resumen de lecturas del aviso.
               </p>
             </div>
           </div>
@@ -874,34 +1057,6 @@ function Input({
         className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
       />
     </label>
-  );
-}
-
-function MessageBox({ type, message, onClose }) {
-  const success = type === 'success';
-
-  return (
-    <div className={`${success ? 'bg-green-50 border-green-100 text-success' : 'bg-red-50 border-red-100 text-danger'} border rounded-2xl p-4 flex items-start justify-between gap-3`}>
-      <div className="flex gap-3">
-        {success ? (
-          <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
-        ) : (
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        )}
-
-        <p className="text-sm font-semibold">
-          {message}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="font-extrabold"
-      >
-        <X size={18} />
-      </button>
-    </div>
   );
 }
 

@@ -7,8 +7,11 @@ import {
   Loader2,
   RefreshCw,
   Search,
-  UserRound
+  UserRound,
+  X
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import {
   BIMESTERS,
@@ -43,6 +46,19 @@ function getGradeValue(row) {
   return row.nota || row.calificacion || 'Sin nota';
 }
 
+function getGradeComment(grade) {
+  return String(
+    grade?.comentario ||
+    grade?.observacion ||
+    grade?.comment ||
+    ''
+  ).trim();
+}
+
+function hasValue(value) {
+  return Boolean(String(value || '').trim());
+}
+
 function MyGrades() {
   const user = getStoredUser();
 
@@ -60,6 +76,8 @@ function MyGrades() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
+  const [selectedGradeDetail, setSelectedGradeDetail] = useState(null);
 
   const loadInitial = async () => {
     try {
@@ -84,6 +102,13 @@ function MyGrades() {
   useEffect(() => {
     loadInitial();
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
 
   const loadGrades = async ({ silent = false } = {}) => {
     if (!selectedPeriodId) return;
@@ -253,13 +278,6 @@ function MyGrades() {
         </div>
       </section>
 
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">{error}</p>
-        </div>
-      )}
-
       <section className="grid grid-cols-1 md:grid-cols-4 gap-5">
         <CounterCard icon={ClipboardList} label="Registros" value={counters.total} description="Notas registradas" />
         <CounterCard icon={GraduationCap} label="AD" value={counters.ad} description="Logro destacado" />
@@ -368,7 +386,11 @@ function MyGrades() {
 
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5 p-5">
                 {rows.map((grade, index) => (
-                  <GradeCard key={`${grade.curso_id || grade.id || index}-${grade.bimestre}`} grade={grade} />
+                  <GradeCard
+                    key={`${grade.curso_id || grade.id || index}-${grade.bimestre}`}
+                    grade={grade}
+                    onOpen={() => setSelectedGradeDetail(grade)}
+                  />
                 ))}
               </div>
             </div>
@@ -377,15 +399,101 @@ function MyGrades() {
       ) : (
         <EmptyState text="No hay notas registradas con los filtros aplicados." />
       )}
+      {selectedGradeDetail && (
+        <GradeDetailModal
+          grade={selectedGradeDetail}
+          onClose={() => setSelectedGradeDetail(null)}
+        />
+      )}
     </main>
   );
 }
 
-function GradeCard({ grade }) {
+function GradeDetailModal({ grade, onClose }) {
+  const value = getGradeValue(grade);
+  const comment = getGradeComment(grade);
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <section className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="pr-10">
+          <p className="text-sm font-extrabold text-gold-600 uppercase tracking-[0.16em]">
+            Detalle de nota
+          </p>
+
+          <h2 className="text-2xl font-extrabold text-brand-950 mt-2">
+            {getCourseName(grade)}
+          </h2>
+
+          <p className="text-sm text-slate-500 mt-1">
+            {grade.grado ? `${grade.grado} ${grade.seccion || ''}` : 'Aula no especificada'}
+          </p>
+        </div>
+
+        <div className="mt-6 space-y-3">
+          <DetailRow label="Curso" value={getCourseName(grade)} />
+          {hasValue(grade?.docente) && (
+            <DetailRow label="Docente" value={grade.docente} />
+          )}
+          <DetailRow label="Bimestre" value={grade.bimestre || 'No precisa'} />
+
+          <div className="flex items-center justify-between gap-4 border border-slate-200 rounded-2xl p-4">
+            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+              Nota
+            </span>
+
+            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-extrabold ${getGradeBadgeClass(value)}`}>
+              {value}
+            </span>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+              Observación
+            </p>
+
+            <p className="text-sm text-brand-950 mt-2 leading-relaxed">
+              {comment || 'Sin observación registrada.'}
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border border-slate-200 rounded-2xl p-4">
+      <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+        {label}
+      </span>
+
+      <span className="text-sm font-bold text-brand-950 text-right">
+        {value || 'No precisa'}
+      </span>
+    </div>
+  );
+}
+
+function GradeCard({ grade, onOpen }) {
   const value = getGradeValue(grade);
 
   return (
-    <div className="border border-slate-200 rounded-3xl p-5 hover:bg-slate-50 transition">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="text-left border border-slate-200 rounded-3xl p-5 hover:bg-slate-50 hover:-translate-y-1 hover:shadow-md transition"
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-extrabold text-brand-950">
@@ -402,12 +510,16 @@ function GradeCard({ grade }) {
         </span>
       </div>
 
-      {grade.observacion && (
-        <p className="text-sm text-slate-500 mt-4">
-          {grade.observacion}
+      <p className="text-xs text-slate-400 mt-4">
+        Toca para ver el detalle.
+      </p>
+
+      {getGradeComment(grade) && (
+        <p className="text-sm text-slate-500 mt-3 line-clamp-2">
+          {getGradeComment(grade)}
         </p>
       )}
-    </div>
+    </button>
   );
 }
 

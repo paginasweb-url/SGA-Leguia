@@ -48,10 +48,10 @@ function EnrollmentFormats() {
     try {
       setDownloadingId(format.id);
 
-      await downloadEnrollmentFormat(
-        format.id,
-        format.nombre_archivo || 'formato_matricula.pdf'
-      );
+      await downloadEnrollmentFormat({
+        id: format.id,
+        fallbackFileName: format.nombre_archivo || 'formato_matricula.pdf'
+      });
     } catch (error) {
       setError(
         error?.response?.data?.error ||

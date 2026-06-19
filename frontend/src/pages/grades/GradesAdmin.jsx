@@ -8,8 +8,11 @@ import {
   Loader2,
   RefreshCw,
   Search,
-  Users
+  Users,
+  X
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import {
   BIMESTERS,
@@ -31,6 +34,19 @@ function getStudentId(student) {
 
 function getGradeValue(row) {
   return row.nota || row.calificacion || '';
+}
+
+function getGradeComment(grade) {
+  return String(
+    grade?.comentario ||
+    grade?.observacion ||
+    grade?.comment ||
+    ''
+  ).trim();
+}
+
+function hasValue(value) {
+  return Boolean(String(value || '').trim());
 }
 
 function getCurrentPeriodId(periods) {
@@ -60,6 +76,8 @@ function GradesAdmin() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [loadingSheet, setLoadingSheet] = useState(false);
   const [error, setError] = useState('');
+
+  const [selectedGradeDetail, setSelectedGradeDetail] = useState(null);
 
   const loadInitialData = async () => {
     try {
@@ -98,6 +116,13 @@ function GradesAdmin() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
 
   const classrooms = useMemo(() => {
     const map = new Map();
@@ -272,13 +297,6 @@ function GradesAdmin() {
         </div>
       </section>
 
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">{error}</p>
-        </div>
-      )}
-
       <section className="grid grid-cols-1 md:grid-cols-4 gap-5">
         <CounterCard icon={Users} label="Estudiantes" value={counters.total} description="En el aula" />
         <CounterCard icon={ClipboardList} label="Con nota" value={counters.graded} description="Registrados" />
@@ -371,20 +389,135 @@ function GradesAdmin() {
         ) : filteredRows.length > 0 ? (
           <div className="divide-y divide-slate-100 max-h-[620px] overflow-y-auto">
             {filteredRows.map((row) => (
-              <StudentGradeViewRow key={getStudentId(row)} row={row} />
+              <StudentGradeViewRow
+                key={getStudentId(row)}
+                row={row}
+                onOpen={() => setSelectedGradeDetail(row)}
+              />
             ))}
           </div>
         ) : (
           <EmptyState text="No hay estudiantes para mostrar." />
         )}
       </section>
+      {selectedGradeDetail && (
+        <GradeDetailModal
+          grade={selectedGradeDetail}
+          title="Detalle de nota"
+          onClose={() => setSelectedGradeDetail(null)}
+        />
+      )}
     </main>
   );
 }
 
-function StudentGradeViewRow({ row }) {
+function GradeDetailModal({ grade, title = 'Detalle de nota', onClose }) {
+  const value = grade?.nota || grade?.calificacion || 'Sin nota';
+  const comment = getGradeComment(grade);
+
+  const studentName = grade?.apellidos
+      ? `${grade.apellidos}, ${grade.nombres}`
+      : grade?.estudiante || 'Estudiante';
+    const courseName =
+    grade?.curso ||
+    grade?.curso_nombre ||
+    grade?.nombre_curso ||
+    '';
+
+  const classroomName = grade?.grado
+    ? `${grade.grado} ${grade.seccion || ''}`
+    : grade?.aula || '';
+
+  const hasValue = (value) => {
+    return Boolean(String(value || '').trim());
+  };
   return (
-    <div className="p-5 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_120px_260px] gap-4 lg:items-center hover:bg-slate-50 transition">
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <section className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="pr-10">
+          <p className="text-sm font-extrabold text-gold-600 uppercase tracking-[0.16em]">
+            {title}
+          </p>
+
+          <h2 className="text-2xl font-extrabold text-brand-950 mt-2">
+            {studentName}
+          </h2>
+
+          {grade?.dni && (
+            <p className="text-sm text-slate-500 mt-1">
+              DNI {grade.dni} · Código {grade.codigo_estudiante || 'No precisa'}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-6 space-y-3">
+          {hasValue(courseName) && (
+            <DetailRow label="Curso" value={courseName} />
+          )}
+
+          {hasValue(grade?.bimestre) && (
+            <DetailRow label="Bimestre" value={grade.bimestre} />
+          )}
+
+          {hasValue(classroomName) && (
+            <DetailRow label="Aula" value={classroomName} />
+          )}
+
+          <div className="flex items-center justify-between gap-4 border border-slate-200 rounded-2xl p-4">
+            <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+              Nota
+            </span>
+
+            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-extrabold ${getGradeBadgeClass(value)}`}>
+              {value}
+            </span>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+              Observación
+            </p>
+
+            <p className="text-sm text-brand-950 mt-2 leading-relaxed">
+              {comment || 'Sin observación registrada.'}
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border border-slate-200 rounded-2xl p-4">
+      <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide">
+        {label}
+      </span>
+
+      <span className="text-sm font-bold text-brand-950 text-right">
+        {value || 'No precisa'}
+      </span>
+    </div>
+  );
+}
+
+function StudentGradeViewRow({ row, onOpen }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full text-left p-5 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_120px_260px] gap-4 lg:items-center hover:bg-slate-50 transition"
+    >
       <div className="flex items-start gap-3 min-w-0">
         <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center shrink-0">
           <GraduationCap size={22} />
@@ -405,10 +538,10 @@ function StudentGradeViewRow({ row }) {
         {row.nota || 'Sin nota'}
       </span>
 
-      <p className="text-sm text-slate-500">
-        {row.observacion || 'Sin observación'}
+      <p className="text-sm text-slate-500 line-clamp-2">
+        {getGradeComment(row) || 'Sin observación'}
       </p>
-    </div>
+    </button>
   );
 }
 

@@ -4,7 +4,6 @@ import {
   Building2,
   CheckCircle2,
   Edit3,
-  Eye,
   GraduationCap,
   Layers,
   LayoutGrid,
@@ -17,6 +16,8 @@ import {
   UserCheck,
   X
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import {
   createClassroom,
@@ -103,6 +104,26 @@ function ClassroomsAdmin() {
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [confirmModal, setConfirmModal] = useState(null);
+
+  const closeConfirmModal = () => {
+    setConfirmModal(null);
+  };
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
   const loadData = async ({ silent = false } = {}) => {
     try {
@@ -252,6 +273,19 @@ function ClassroomsAdmin() {
     }
   };
 
+  const closeAcademicModal = () => {
+    setShowCreateClassroom(false);
+    setShowCreateGrade(false);
+    setShowCreateSection(false);
+
+    setSelectedClassroom(null);
+    setSelectedGrade(null);
+    setSelectedSection(null);
+
+    setError('');
+    setSuccessMessage('');
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setError('');
@@ -378,35 +412,39 @@ function ClassroomsAdmin() {
     }
   };
 
-  const handleDeactivateClassroom = async (classroom) => {
-    const confirmed = window.confirm(
-      `¿Deseas desactivar el aula ${classroom.grado} ${classroom.seccion} - ${classroom.turno}?`
-    );
+  const handleDeactivateClassroom = (classroom) => {
+    setConfirmModal({
+      type: 'danger',
+      title: 'Desactivar aula',
+      description: `¿Deseas desactivar el aula ${classroom.grado} ${classroom.seccion} - ${classroom.turno}? Esta aula dejará de estar disponible para nuevas asignaciones.`,
+      confirmText: 'Desactivar aula',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        try {
+          setError('');
+          setSuccessMessage('');
+          setDeactivatingClassroomId(classroom.id);
 
-    if (!confirmed) return;
+          const response = await deactivateClassroom(classroom.id);
 
-    try {
-      setError('');
-      setSuccessMessage('');
-      setDeactivatingClassroomId(classroom.id);
+          setSuccessMessage(response.message || 'Aula desactivada correctamente.');
 
-      const response = await deactivateClassroom(classroom.id);
+          if (selectedClassroom?.id === classroom.id) {
+            setSelectedClassroom(null);
+          }
 
-      setSuccessMessage(response.message || 'Aula desactivada correctamente.');
-
-      if (selectedClassroom?.id === classroom.id) {
-        setSelectedClassroom(null);
+          await loadData({ silent: true });
+        } catch (error) {
+          setError(
+            error?.response?.data?.error ||
+            'No se pudo desactivar el aula.'
+          );
+        } finally {
+          setDeactivatingClassroomId(null);
+          closeConfirmModal();
+        }
       }
-
-      await loadData({ silent: true });
-    } catch (error) {
-      setError(
-        error?.response?.data?.error ||
-        'No se pudo desactivar el aula.'
-      );
-    } finally {
-      setDeactivatingClassroomId(null);
-    }
+    });
   };
 
   const handleSubmitGrade = async (e) => {
@@ -511,32 +549,38 @@ function ClassroomsAdmin() {
       return;
     }
 
-    const confirmed = window.confirm(`¿Deseas eliminar el grado ${grade.nombre}?`);
+    setConfirmModal({
+      type: 'danger',
+      title: 'Eliminar grado',
+      description: `¿Deseas eliminar el grado ${grade.nombre}? Esta acción no se podrá deshacer.`,
+      confirmText: 'Eliminar grado',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        try {
+          setError('');
+          setSuccessMessage('');
+          setDeletingGradeId(grade.id);
 
-    if (!confirmed) return;
+          const response = await deleteGrade(grade.id);
 
-    try {
-      setError('');
-      setSuccessMessage('');
-      setDeletingGradeId(grade.id);
+          setSuccessMessage(response.message || 'Grado eliminado correctamente.');
 
-      const response = await deleteGrade(grade.id);
+          if (selectedGrade?.id === grade.id) {
+            setSelectedGrade(null);
+          }
 
-      setSuccessMessage(response.message || 'Grado eliminado correctamente.');
-
-      if (selectedGrade?.id === grade.id) {
-        setSelectedGrade(null);
+          await loadData({ silent: true });
+        } catch (error) {
+          setError(
+            error?.response?.data?.error ||
+            'No se pudo eliminar el grado.'
+          );
+        } finally {
+          setDeletingGradeId(null);
+          closeConfirmModal();
+        }
       }
-
-      await loadData({ silent: true });
-    } catch (error) {
-      setError(
-        error?.response?.data?.error ||
-        'No se pudo eliminar el grado.'
-      );
-    } finally {
-      setDeletingGradeId(null);
-    }
+    });
   };
 
   const handleDeleteSection = async (section) => {
@@ -549,32 +593,38 @@ function ClassroomsAdmin() {
       return;
     }
 
-    const confirmed = window.confirm(`¿Deseas eliminar la sección ${section.nombre}?`);
+    setConfirmModal({
+      type: 'danger',
+      title: 'Eliminar sección',
+      description: `¿Deseas eliminar la sección ${section.nombre}? Esta acción no se podrá deshacer.`,
+      confirmText: 'Eliminar sección',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        try {
+          setError('');
+          setSuccessMessage('');
+          setDeletingSectionId(section.id);
 
-    if (!confirmed) return;
+          const response = await deleteSection(section.id);
 
-    try {
-      setError('');
-      setSuccessMessage('');
-      setDeletingSectionId(section.id);
+          setSuccessMessage(response.message || 'Sección eliminada correctamente.');
 
-      const response = await deleteSection(section.id);
+          if (selectedSection?.id === section.id) {
+            setSelectedSection(null);
+          }
 
-      setSuccessMessage(response.message || 'Sección eliminada correctamente.');
-
-      if (selectedSection?.id === section.id) {
-        setSelectedSection(null);
+          await loadData({ silent: true });
+        } catch (error) {
+          setError(
+            error?.response?.data?.error ||
+            'No se pudo eliminar la sección.'
+          );
+        } finally {
+          setDeletingSectionId(null);
+          closeConfirmModal();
+        }
       }
-
-      await loadData({ silent: true });
-    } catch (error) {
-      setError(
-        error?.response?.data?.error ||
-        'No se pudo eliminar la sección.'
-      );
-    } finally {
-      setDeletingSectionId(null);
-    }
+    });
   };
 
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
@@ -638,14 +688,6 @@ function ClassroomsAdmin() {
           </div>
         </div>
       </section>
-
-      {error && (
-        <MessageBox type="error" message={error} onClose={() => setError('')} />
-      )}
-
-      {successMessage && (
-        <MessageBox type="success" message={successMessage} onClose={() => setSuccessMessage('')} />
-      )}
 
       <section className="grid grid-cols-1 md:grid-cols-4 gap-5">
         <CounterCard icon={Building2} label="Aulas" value={counters.total} description="Aulas registradas" />
@@ -716,6 +758,7 @@ function ClassroomsAdmin() {
                 className="lg:col-span-3 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
               >
                 <option value="todos">Todos los grados</option>
+
                 {grades.map((grade) => (
                   <option key={grade.id} value={grade.id}>
                     {grade.nombre}
@@ -734,11 +777,8 @@ function ClassroomsAdmin() {
                 className="lg:col-span-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
               >
                 <option value="todos">Todos los turnos</option>
-                {turnOptions.map((turn) => (
-                  <option key={turn} value={turn}>
-                    {turn}
-                  </option>
-                ))}
+                <option value="Mañana">Mañana</option>
+                <option value="Tarde">Tarde</option>
               </select>
 
               <select
@@ -761,15 +801,15 @@ function ClassroomsAdmin() {
       </section>
 
       {activeTab === 'aulas' && (
-        <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-          <div className="xl:col-span-7 bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+        <>
+          <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
             <PanelHeader
               title="Listado de aulas"
               description="Aulas registradas con capacidad, matriculados y vacantes."
               count={filteredClassrooms.length}
             />
 
-            <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[360px] overflow-y-auto">
+            <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[420px] overflow-y-auto">
               {filteredClassrooms.length > 0 ? (
                 filteredClassrooms.map((classroom) => (
                   <ClassroomRow
@@ -782,13 +822,16 @@ function ClassroomsAdmin() {
                   />
                 ))
               ) : (
-                <EmptyBlock icon={Building2} text="No se encontraron aulas con los filtros aplicados." />
+                <EmptyBlock
+                  icon={Building2}
+                  text="No se encontraron aulas con los filtros aplicados."
+                />
               )}
             </div>
-          </div>
+          </section>
 
-          <div className="xl:col-span-5">
-            {showCreateClassroom || selectedClassroom ? (
+          {(showCreateClassroom || selectedClassroom) && (
+            <AcademicModal onClose={closeAcademicModal}>
               <ClassroomFormPanel
                 mode={showCreateClassroom ? 'create' : 'edit'}
                 classroom={selectedClassroom}
@@ -799,61 +842,154 @@ function ClassroomsAdmin() {
                 onChange={handleClassroomChange}
                 onSubmit={handleSubmitClassroom}
               />
-            ) : (
-              <EmptyDetail
-                icon={Building2}
-                title="Selecciona un aula"
-                description="Aquí podrás editar capacidad, estado o registrar una nueva aula."
-              />
-            )}
-          </div>
-        </section>
+            </AcademicModal>
+          )}
+        </>
       )}
 
       {activeTab === 'grados' && (
-        <CatalogSection
-          title="Listado de grados"
-          description="Catálogo dinámico de grados usados por las aulas."
-          items={filteredGrades}
-          selectedItem={selectedGrade}
-          showCreate={showCreateGrade}
-          form={gradeForm}
-          formTitle={showCreateGrade ? 'Nuevo grado' : 'Editar grado'}
-          formDescription={showCreateGrade ? 'Registra un grado académico.' : `Grado #${selectedGrade?.id || ''}`}
-          icon={GraduationCap}
-          saving={savingGrade}
-          deletingId={deletingGradeId}
-          onSelect={handleSelectGrade}
-          onDelete={handleDeleteGrade}
-          onChange={(value) => setGradeForm({ nombre: value })}
-          onSubmit={handleSubmitGrade}
-          emptyTitle="Selecciona un grado"
-          emptyDescription="Aquí podrás crear o editar grados disponibles para las aulas."
-        />
+        <>
+          <CatalogSection
+            title="Listado de grados"
+            description="Catálogo dinámico de grados usados por las aulas."
+            items={filteredGrades}
+            selectedItem={selectedGrade}
+            icon={GraduationCap}
+            deletingId={deletingGradeId}
+            onSelect={handleSelectGrade}
+            onDelete={handleDeleteGrade}
+          />
+
+          {(showCreateGrade || selectedGrade) && (
+            <AcademicModal onClose={closeAcademicModal}>
+              <CatalogFormPanel
+                icon={GraduationCap}
+                title={showCreateGrade ? 'Nuevo grado' : 'Editar grado'}
+                description={showCreateGrade ? 'Registra un grado académico.' : `Grado #${selectedGrade?.id || ''}`}
+                value={gradeForm.nombre}
+                saving={savingGrade}
+                onChange={(value) => setGradeForm({ nombre: value })}
+                onSubmit={handleSubmitGrade}
+              />
+            </AcademicModal>
+          )}
+        </>
       )}
 
       {activeTab === 'secciones' && (
-        <CatalogSection
-          title="Listado de secciones"
-          description="Catálogo dinámico de secciones usadas por las aulas."
-          items={filteredSections}
-          selectedItem={selectedSection}
-          showCreate={showCreateSection}
-          form={sectionForm}
-          formTitle={showCreateSection ? 'Nueva sección' : 'Editar sección'}
-          formDescription={showCreateSection ? 'Registra una sección académica.' : `Sección #${selectedSection?.id || ''}`}
-          icon={Layers}
-          saving={savingSection}
-          deletingId={deletingSectionId}
-          onSelect={handleSelectSection}
-          onDelete={handleDeleteSection}
-          onChange={(value) => setSectionForm({ nombre: value })}
-          onSubmit={handleSubmitSection}
-          emptyTitle="Selecciona una sección"
-          emptyDescription="Aquí podrás crear o editar secciones disponibles para las aulas."
+        <>
+          <CatalogSection
+            title="Listado de secciones"
+            description="Catálogo dinámico de secciones usadas por las aulas."
+            items={filteredSections}
+            selectedItem={selectedSection}
+            icon={Layers}
+            deletingId={deletingSectionId}
+            onSelect={handleSelectSection}
+            onDelete={handleDeleteSection}
+          />
+
+          {(showCreateSection || selectedSection) && (
+            <AcademicModal onClose={closeAcademicModal}>
+              <CatalogFormPanel
+                icon={Layers}
+                title={showCreateSection ? 'Nueva sección' : 'Editar sección'}
+                description={showCreateSection ? 'Registra una sección académica.' : `Sección #${selectedSection?.id || ''}`}
+                value={sectionForm.nombre}
+                saving={savingSection}
+                onChange={(value) => setSectionForm({ nombre: value })}
+                onSubmit={handleSubmitSection}
+              />
+            </AcademicModal>
+          )}
+        </>
+      )}
+      {confirmModal && (
+        <ConfirmModal
+          config={confirmModal}
+          onClose={closeConfirmModal}
         />
       )}
     </main>
+  );
+}
+
+function ConfirmModal({ config, onClose }) {
+  const danger = config.type === 'danger';
+
+  const handleConfirm = async () => {
+    if (config.onConfirm) {
+      await config.onConfirm();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <section className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6">
+        <div className="flex items-start gap-4">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+              danger
+                ? 'bg-red-50 text-danger'
+                : 'bg-brand-50 text-brand-900'
+            }`}
+          >
+            {danger ? <Trash2 size={24} /> : <AlertCircle size={24} />}
+          </div>
+
+          <div className="min-w-0">
+            <h2 className="text-xl font-extrabold text-brand-950">
+              {config.title || 'Confirmar acción'}
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-2">
+              {config.description || '¿Deseas continuar?'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-extrabold hover:bg-slate-100 transition"
+          >
+            {config.cancelText || 'Cancelar'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className={`inline-flex items-center justify-center px-4 py-3 rounded-xl font-extrabold transition ${
+              danger
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-brand-900 text-white hover:bg-brand-800'
+            }`}
+          >
+            {config.confirmText || 'Confirmar'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function AcademicModal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-6">
+      <section className="relative w-full lg:max-w-4xl max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        {children}
+      </section>
+    </div>
   );
 }
 
@@ -862,61 +998,30 @@ function CatalogSection({
   description,
   items,
   selectedItem,
-  showCreate,
-  form,
-  formTitle,
-  formDescription,
   icon: Icon,
-  saving,
   deletingId,
   onSelect,
-  onDelete,
-  onChange,
-  onSubmit,
-  emptyTitle,
-  emptyDescription
+  onDelete
 }) {
   return (
-    <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-      <div className="xl:col-span-7 bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
-        <PanelHeader title={title} description={description} count={items.length} />
+    <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+      <PanelHeader title={title} description={description} count={items.length} />
 
-        <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[360px] overflow-y-auto">
-          {items.length > 0 ? (
-            items.map((item) => (
-              <CatalogRow
-                key={item.id}
-                item={item}
-                icon={Icon}
-                active={selectedItem?.id === item.id}
-                deleting={deletingId === item.id}
-                onSelect={() => onSelect(item)}
-                onDelete={() => onDelete(item)}
-              />
-            ))
-          ) : (
-            <EmptyBlock icon={Icon} text="No se encontraron registros." />
-          )}
-        </div>
-      </div>
-
-      <div className="xl:col-span-5">
-        {showCreate || selectedItem ? (
-          <CatalogFormPanel
-            icon={Icon}
-            title={formTitle}
-            description={formDescription}
-            value={form.nombre}
-            saving={saving}
-            onChange={onChange}
-            onSubmit={onSubmit}
-          />
+      <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[420px] overflow-y-auto">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <CatalogRow
+              key={item.id}
+              item={item}
+              icon={Icon}
+              active={selectedItem?.id === item.id}
+              deleting={deletingId === item.id}
+              onSelect={() => onSelect(item)}
+              onDelete={() => onDelete(item)}
+            />
+          ))
         ) : (
-          <EmptyDetail
-            icon={Icon}
-            title={emptyTitle}
-            description={emptyDescription}
-          />
+          <EmptyBlock icon={Icon} text="No se encontraron registros." />
         )}
       </div>
     </section>
@@ -1003,14 +1108,6 @@ function ClassroomRow({
         </div>
 
         <div className="flex justify-start lg:justify-end gap-2">
-          <button
-            type="button"
-            onClick={onSelect}
-            className="p-2 text-brand-900 hover:bg-brand-50 rounded-xl transition"
-            title="Ver detalle"
-          >
-            <Eye size={18} />
-          </button>
 
           <button
             type="button"
@@ -1072,14 +1169,6 @@ function CatalogRow({
         </button>
 
         <div className="flex justify-start lg:justify-end gap-2">
-          <button
-            type="button"
-            onClick={onSelect}
-            className="p-2 text-brand-900 hover:bg-brand-50 rounded-xl transition"
-            title="Ver detalle"
-          >
-            <Eye size={18} />
-          </button>
 
           <button
             type="button"
@@ -1124,7 +1213,7 @@ function ClassroomFormPanel({
       onSubmit={onSubmit}
       className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pr-10">
         <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
           <LayoutGrid size={23} />
         </div>
@@ -1236,7 +1325,7 @@ function CatalogFormPanel({
       onSubmit={onSubmit}
       className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pr-10">
         <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
           <Icon size={23} />
         </div>
@@ -1371,34 +1460,6 @@ function SelectField({
   );
 }
 
-function MessageBox({ type, message, onClose }) {
-  const success = type === 'success';
-
-  return (
-    <div className={`${success ? 'bg-green-50 border-green-100 text-success' : 'bg-red-50 border-red-100 text-danger'} border rounded-2xl p-4 flex items-start justify-between gap-3`}>
-      <div className="flex gap-3">
-        {success ? (
-          <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
-        ) : (
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        )}
-
-        <p className="text-sm font-semibold">
-          {message}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="font-extrabold"
-      >
-        <X size={18} />
-      </button>
-    </div>
-  );
-}
-
 function EmptyBlock({ icon: Icon, text }) {
   return (
     <div className="p-8 text-center">
@@ -1406,26 +1467,6 @@ function EmptyBlock({ icon: Icon, text }) {
 
       <p className="text-sm text-slate-500 mt-3">
         {text}
-      </p>
-    </div>
-  );
-}
-
-function EmptyDetail({
-  icon: Icon,
-  title,
-  description
-}) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-8 text-center">
-      <Icon className="mx-auto text-slate-300" size={46} />
-
-      <h2 className="text-xl font-extrabold text-brand-950 mt-4">
-        {title}
-      </h2>
-
-      <p className="text-sm text-slate-500 mt-2">
-        {description}
       </p>
     </div>
   );

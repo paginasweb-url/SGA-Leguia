@@ -11,6 +11,8 @@ import {
   UserRoundCheck
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 import { getMyTeacherCourses } from '../../services/teacherCourses.service';
 import { getStoredUser } from '../../utils/storage';
 
@@ -24,6 +26,13 @@ function TeacherCourses() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
 
   const loadCourses = async ({ silent = false } = {}) => {
     try {
@@ -167,13 +176,6 @@ function TeacherCourses() {
           </button>
         </div>
       </section>
-
-      {error && (
-        <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-          <p className="text-sm font-semibold">{error}</p>
-        </div>
-      )}
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <CounterCard icon={BookOpen} label="Cursos" value={counters.totalCourses} description="Cursos asignados" />

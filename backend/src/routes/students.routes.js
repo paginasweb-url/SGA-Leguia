@@ -2,6 +2,7 @@ import express from 'express';
 
 import {
   getAllStudents,
+  getAuxiliaryStudents,
   createNewStudent,
   getStudent,
   updateExistingStudent,
@@ -27,6 +28,13 @@ router.post(
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
   createNewStudent
+);
+
+router.get(
+  '/auxiliary',
+  verifyToken,
+  authorizeRoles('Auxiliar', 'Director'),
+  getAuxiliaryStudents
 );
 
 router.get(

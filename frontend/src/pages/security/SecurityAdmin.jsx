@@ -17,6 +17,8 @@ import {
   X
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 import {
   approvePasswordRecoveryRequest,
   getAccessHistory,
@@ -232,6 +234,20 @@ function SecurityAdmin() {
     loadRoles();
   }, []);
 
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
+
   const recoveryCounters = useMemo(() => {
     return recoveryRequests.reduce(
       (acc, item) => {
@@ -362,7 +378,17 @@ function SecurityAdmin() {
 
   const copyText = async (text) => {
     if (!text) return;
+
     await navigator.clipboard.writeText(String(text));
+    toast.success('Copiado al portapapeles.');
+  };
+
+  const closeRecoveryModal = () => {
+    setSelectedRequest(null);
+    setTemporaryPasswordResult(null);
+    setObservation('');
+    setError('');
+    setSuccessMessage('');
   };
 
   const canManageRecovery = selectedRequest?.estado === 'pendiente';
@@ -389,21 +415,6 @@ function SecurityAdmin() {
         </button>
       </PageHeader>
 
-      {error && (
-        <MessageBox type="error" message={error} onClose={() => setError('')} />
-      )}
-
-      {successMessage && (
-        <MessageBox type="success" message={successMessage} onClose={() => setSuccessMessage('')} />
-      )}
-
-      {temporaryPasswordResult && (
-        <TemporaryPasswordBox
-          result={temporaryPasswordResult}
-          onCopy={copyText}
-        />
-      )}
-
       <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-2 flex flex-col sm:flex-row gap-2">
         <button
           type="button"
@@ -420,7 +431,10 @@ function SecurityAdmin() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('access')}
+          onClick={() => {
+            setActiveTab('access');
+            closeRecoveryModal();
+          }}
           className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-extrabold transition ${
             activeTab === 'access'
               ? 'bg-brand-900 text-white'
@@ -441,238 +455,120 @@ function SecurityAdmin() {
             <CounterCard label="Rechazadas" value={recoveryCounters.rechazada} status="rechazada" />
           </section>
 
-          <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-            <div className="xl:col-span-5 bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
-              <div className="p-5 border-b border-slate-100 space-y-4">
+          <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+            <div className="p-5 border-b border-slate-100 space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-extrabold text-brand-950">
                     Solicitudes registradas
                   </h2>
 
                   <p className="text-sm text-slate-500 mt-1">
-                    Solicitudes creadas desde el formulario público.
+                    Solicitudes creadas desde el formulario público. Selecciona una para revisar el detalle.
                   </p>
                 </div>
 
-                <form onSubmit={handleRecoverySearch} className="space-y-3">
-                  <div className="relative">
-                    <Search size={18} className="absolute left-3 top-3.5 text-slate-400" />
-                    <input
-                      value={recoveryFilters.usuario}
-                      onChange={(e) =>
-                        setRecoveryFilters((prev) => ({
-                          ...prev,
-                          usuario: e.target.value
-                        }))
-                      }
-                      placeholder="Buscar por usuario ingresado"
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                    />
-                  </div>
-
-                  <div className="grid sm:grid-cols-3 gap-3">
-                    <select
-                      value={recoveryFilters.estado}
-                      onChange={(e) =>
-                        setRecoveryFilters((prev) => ({
-                          ...prev,
-                          estado: e.target.value
-                        }))
-                      }
-                      className="px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                    >
-                      <option value="todos">Todos</option>
-                      <option value="pendiente">Pendientes</option>
-                      <option value="aprobada">Aprobadas</option>
-                      <option value="rechazada">Rechazadas</option>
-                    </select>
-
-                    <select
-                      value={recoveryFilters.tipo}
-                      onChange={(e) =>
-                        setRecoveryFilters((prev) => ({
-                          ...prev,
-                          tipo: e.target.value
-                        }))
-                      }
-                      className="px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
-                    >
-                      <option value="todos">Todos los tipos</option>
-                      <option value="estudiante">Estudiante</option>
-                      <option value="apoderado">Apoderado</option>
-                      <option value="manual">Manual</option>
-                    </select>
-
-                    <button
-                      type="submit"
-                      className="inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-4 py-3 rounded-xl font-extrabold hover:bg-brand-800 transition"
-                    >
-                      Buscar
-                    </button>
-                  </div>
-                </form>
+                <span className="hidden sm:inline-flex rounded-full px-3 py-1 text-xs font-extrabold bg-brand-50 text-brand-900 border border-brand-100">
+                  {recoveryRequests.length} resultado(s)
+                </span>
               </div>
 
-              <div className="divide-y divide-slate-100 max-h-[760px] overflow-y-auto">
-                {loadingRecovery ? (
-                  <LoadingBlock text="Cargando solicitudes..." />
-                ) : recoveryRequests.length > 0 ? (
-                  recoveryRequests.map((item) => (
-                    <RecoveryRequestItem
-                      key={item.id}
-                      item={item}
-                      active={selectedRequest?.id === item.id}
-                      onClick={() => loadRecoveryDetail(item.id)}
-                    />
-                  ))
-                ) : (
-                  <EmptyBlock text="No se encontraron solicitudes de recuperación." />
-                )}
-              </div>
+              <form onSubmit={handleRecoverySearch} className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                <div className="relative lg:col-span-5">
+                  <Search size={18} className="absolute left-3 top-3.5 text-slate-400" />
+
+                  <input
+                    value={recoveryFilters.usuario}
+                    onChange={(e) =>
+                      setRecoveryFilters((prev) => ({
+                        ...prev,
+                        usuario: e.target.value
+                      }))
+                    }
+                    placeholder="Buscar por usuario ingresado"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+                  />
+                </div>
+
+                <select
+                  value={recoveryFilters.estado}
+                  onChange={(e) =>
+                    setRecoveryFilters((prev) => ({
+                      ...prev,
+                      estado: e.target.value
+                    }))
+                  }
+                  className="lg:col-span-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="pendiente">Pendientes</option>
+                  <option value="aprobada">Aprobadas</option>
+                  <option value="rechazada">Rechazadas</option>
+                </select>
+
+                <select
+                  value={recoveryFilters.tipo}
+                  onChange={(e) =>
+                    setRecoveryFilters((prev) => ({
+                      ...prev,
+                      tipo: e.target.value
+                    }))
+                  }
+                  className="lg:col-span-2 px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800"
+                >
+                  <option value="todos">Todos los tipos</option>
+                  <option value="estudiante">Estudiante</option>
+                  <option value="apoderado">Apoderado</option>
+                  <option value="manual">Manual</option>
+                </select>
+
+                <button
+                  type="submit"
+                  className="lg:col-span-3 inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-4 py-3 rounded-xl font-extrabold hover:bg-brand-800 transition"
+                >
+                  Buscar
+                </button>
+              </form>
             </div>
 
-            <div className="xl:col-span-7">
-              {!selectedRequest && (
-                <EmptyDetail
-                  icon={KeyRound}
-                  title="Selecciona una solicitud"
-                  text="Aquí se mostrará el detalle de validación y acciones administrativas."
-                />
-              )}
-
-              {loadingDetail && (
-                <LoadingCard text="Cargando detalle de la solicitud..." />
-              )}
-
-              {selectedRequest && !loadingDetail && (
-                <div className="space-y-5">
-                  <RecoveryDetailHeader request={selectedRequest} />
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <InfoCard
-                      icon={User}
-                      title="Usuario asociado"
-                      items={[
-                        ['Usuario ingresado', selectedRequest.usuario_ingresado],
-                        ['DNI ingresado', selectedRequest.dni_ingresado],
-                        ['Usuario encontrado', selectedRequest.username],
-                        ['Correo', selectedRequest.correo],
-                        ['Rol', selectedRequest.rol],
-                        ['Estado de usuario', selectedRequest.user_estado]
-                      ]}
-                    />
-
-                    <InfoCard
-                      icon={ShieldCheck}
-                      title="Validación y registro"
-                      items={[
-                        ['Tipo solicitante', selectedRequest.tipo_solicitante],
-                        ['DNI validación secundaria', selectedRequest.estudiante_dni_validacion],
-                        ['IP', selectedRequest.ip],
-                        ['Fecha solicitud', formatDateTime(selectedRequest.created_at)],
-                        ['Fecha revisión', formatDateTime(selectedRequest.reviewed_at)],
-                        ['Fecha reset', formatDateTime(selectedRequest.password_reset_at)]
-                      ]}
-                    />
-                  </div>
-
-                  {selectedRequest.user_agent && (
-                    <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
-                      <h3 className="font-extrabold text-brand-950 text-lg">
-                        Navegador / dispositivo
-                      </h3>
-
-                      <p className="text-sm text-slate-600 mt-2 break-all">
-                        {selectedRequest.user_agent}
-                      </p>
-                    </div>
-                  )}
-
-                  {selectedRequest.observacion_admin && (
-                    <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
-                      <div className="flex gap-3">
-                        <AlertCircle className="text-warning shrink-0 mt-0.5" size={22} />
-
-                        <div>
-                          <h3 className="font-extrabold text-brand-950">
-                            Observación administrativa
-                          </h3>
-
-                          <p className="text-sm text-slate-600 mt-2">
-                            {selectedRequest.observacion_admin}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
-                        <LockKeyhole size={23} />
-                      </div>
-
-                      <div>
-                        <h3 className="font-extrabold text-brand-950 text-lg">
-                          Acciones administrativas
-                        </h3>
-
-                        <p className="text-sm text-slate-500">
-                          Aprueba, rechaza o realiza un restablecimiento manual.
-                        </p>
-                      </div>
-                    </div>
-
-                    <textarea
-                      value={observation}
-                      onChange={(e) => setObservation(e.target.value)}
-                      rows={4}
-                      placeholder="Escribe una observación administrativa..."
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800 resize-none"
-                    />
-
-                    <div className="flex flex-col sm:flex-row gap-3 mt-4">
-                      <button
-                        type="button"
-                        onClick={handleApprove}
-                        disabled={!canManageRecovery || processingAction}
-                        className="inline-flex items-center justify-center gap-2 bg-success text-white px-5 py-3 rounded-xl font-extrabold hover:opacity-90 disabled:opacity-50 transition"
-                      >
-                        <CheckCircle2 size={18} />
-                        Aprobar y generar temporal
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleReject}
-                        disabled={!canManageRecovery || processingAction}
-                        className="inline-flex items-center justify-center gap-2 bg-red-50 border border-red-100 text-danger px-5 py-3 rounded-xl font-extrabold hover:bg-red-100 disabled:opacity-50 transition"
-                      >
-                        <ShieldX size={18} />
-                        Rechazar
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleManualReset}
-                        disabled={!selectedRequest.user_id || processingAction}
-                        className="inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-800 disabled:opacity-50 transition"
-                      >
-                        <KeyRound size={18} />
-                        Reset manual
-                      </button>
-                    </div>
-
-                    {selectedRequest.estado !== 'pendiente' && (
-                      <p className="text-xs text-slate-500 mt-3">
-                        Las solicitudes atendidas no pueden aprobarse o rechazarse nuevamente. Puedes usar reset manual si el usuario existe.
-                      </p>
-                    )}
-                  </div>
-                </div>
+            <div className="divide-y divide-slate-100 max-h-[calc(100vh-420px)] min-h-[420px] overflow-y-auto">
+              {loadingRecovery ? (
+                <LoadingBlock text="Cargando solicitudes..." />
+              ) : recoveryRequests.length > 0 ? (
+                recoveryRequests.map((item) => (
+                  <RecoveryRequestItem
+                    key={item.id}
+                    item={item}
+                    active={selectedRequest?.id === item.id}
+                    onClick={() => loadRecoveryDetail(item.id)}
+                  />
+                ))
+              ) : (
+                <EmptyBlock text="No se encontraron solicitudes de recuperación." />
               )}
             </div>
           </section>
+
+          {(loadingDetail || selectedRequest) && (
+            <SecurityModal onClose={closeRecoveryModal}>
+              {loadingDetail ? (
+                <LoadingCard text="Cargando detalle de la solicitud..." />
+              ) : (
+                <RecoveryDetailContent
+                  selectedRequest={selectedRequest}
+                  temporaryPasswordResult={temporaryPasswordResult}
+                  observation={observation}
+                  setObservation={setObservation}
+                  processingAction={processingAction}
+                  canManageRecovery={canManageRecovery}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onManualReset={handleManualReset}
+                  onCopy={copyText}
+                />
+              )}
+            </SecurityModal>
+          )}
         </>
       )}
 
@@ -771,6 +667,175 @@ function SecurityAdmin() {
         </>
       )}
     </main>
+  );
+}
+
+function SecurityModal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-6">
+      <section className="relative w-full lg:max-w-5xl max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function RecoveryDetailContent({
+  selectedRequest,
+  temporaryPasswordResult,
+  observation,
+  setObservation,
+  processingAction,
+  canManageRecovery,
+  onApprove,
+  onReject,
+  onManualReset,
+  onCopy
+}) {
+  if (!selectedRequest) return null;
+
+  return (
+    <div className="space-y-5">
+      <RecoveryDetailHeader request={selectedRequest} />
+
+      {temporaryPasswordResult && (
+        <TemporaryPasswordBox
+          result={temporaryPasswordResult}
+          onCopy={onCopy}
+        />
+      )}
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <InfoCard
+          icon={User}
+          title="Usuario asociado"
+          items={[
+            ['Usuario ingresado', selectedRequest.usuario_ingresado],
+            ['DNI ingresado', selectedRequest.dni_ingresado],
+            ['Usuario encontrado', selectedRequest.username],
+            ['Correo', selectedRequest.correo],
+            ['Rol', selectedRequest.rol],
+            ['Estado de usuario', selectedRequest.user_estado]
+          ]}
+        />
+
+        <InfoCard
+          icon={ShieldCheck}
+          title="Validación y registro"
+          items={[
+            ['Tipo solicitante', selectedRequest.tipo_solicitante],
+            ['DNI validación secundaria', selectedRequest.estudiante_dni_validacion],
+            ['IP', selectedRequest.ip],
+            ['Fecha solicitud', formatDateTime(selectedRequest.created_at)],
+            ['Fecha revisión', formatDateTime(selectedRequest.reviewed_at)],
+            ['Fecha reset', formatDateTime(selectedRequest.password_reset_at)]
+          ]}
+        />
+      </div>
+
+      {selectedRequest.user_agent && (
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
+          <h3 className="font-extrabold text-brand-950 text-lg">
+            Navegador / dispositivo
+          </h3>
+
+          <p className="text-sm text-slate-600 mt-2 break-all">
+            {selectedRequest.user_agent}
+          </p>
+        </div>
+      )}
+
+      {selectedRequest.observacion_admin && (
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
+          <div className="flex gap-3">
+            <AlertCircle className="text-warning shrink-0 mt-0.5" size={22} />
+
+            <div>
+              <h3 className="font-extrabold text-brand-950">
+                Observación administrativa
+              </h3>
+
+              <p className="text-sm text-slate-600 mt-2">
+                {selectedRequest.observacion_admin}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6">
+        <div className="flex items-center gap-3 mb-5 pr-10">
+          <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
+            <LockKeyhole size={23} />
+          </div>
+
+          <div>
+            <h3 className="font-extrabold text-brand-950 text-lg">
+              Acciones administrativas
+            </h3>
+
+            <p className="text-sm text-slate-500">
+              Aprueba, rechaza o realiza un restablecimiento manual.
+            </p>
+          </div>
+        </div>
+
+        <textarea
+          value={observation}
+          onChange={(e) => setObservation(e.target.value)}
+          rows={4}
+          placeholder="Escribe una observación administrativa..."
+          className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800 resize-none"
+        />
+
+        <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <button
+            type="button"
+            onClick={onApprove}
+            disabled={!canManageRecovery || processingAction}
+            className="inline-flex items-center justify-center gap-2 bg-success text-white px-5 py-3 rounded-xl font-extrabold hover:opacity-90 disabled:opacity-50 transition"
+          >
+            <CheckCircle2 size={18} />
+            Aprobar y generar temporal
+          </button>
+
+          <button
+            type="button"
+            onClick={onReject}
+            disabled={!canManageRecovery || processingAction}
+            className="inline-flex items-center justify-center gap-2 bg-red-50 border border-red-100 text-danger px-5 py-3 rounded-xl font-extrabold hover:bg-red-100 disabled:opacity-50 transition"
+          >
+            <ShieldX size={18} />
+            Rechazar
+          </button>
+
+          <button
+            type="button"
+            onClick={onManualReset}
+            disabled={!selectedRequest.user_id || processingAction}
+            className="inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-800 disabled:opacity-50 transition"
+          >
+            <KeyRound size={18} />
+            Reset manual
+          </button>
+        </div>
+
+        {selectedRequest.estado !== 'pendiente' && (
+          <p className="text-xs text-slate-500 mt-3">
+            Las solicitudes atendidas no pueden aprobarse o rechazarse nuevamente. Puedes usar reset manual si el usuario existe.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1010,30 +1075,6 @@ function AccessCounterCard({ label, value, status }) {
   );
 }
 
-function MessageBox({ type, message, onClose }) {
-  const success = type === 'success';
-
-  return (
-    <div className={`${success ? 'bg-green-50 border-green-100 text-success' : 'bg-red-50 border-red-100 text-danger'} border rounded-2xl p-4 flex items-start justify-between gap-3`}>
-      <div className="flex gap-3">
-        {success ? (
-          <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
-        ) : (
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        )}
-
-        <p className="text-sm font-semibold">
-          {message}
-        </p>
-      </div>
-
-      <button type="button" onClick={onClose} className="font-extrabold">
-        <X size={18} />
-      </button>
-    </div>
-  );
-}
-
 function LoadingBlock({ text }) {
   return (
     <div className="p-8 text-center">
@@ -1085,16 +1126,46 @@ function EmptyDetail({ icon: Icon, title, text }) {
   );
 }
 
-function formatDateTime(value) {
-  if (!value) return 'No precisa';
+const PERU_TIME_ZONE = 'America/Lima';
 
-  return new Date(value).toLocaleString('es-PE', {
+function parseBackendTimestamp(value) {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  const text = String(value).trim();
+
+  if (!text) return null;
+
+  const normalizedText = text.replace(' ', 'T');
+
+  const hasTimezone =
+    normalizedText.endsWith('Z') ||
+    /[+-]\d{2}:?\d{2}$/.test(normalizedText);
+
+  const date = new Date(
+    hasTimezone ? normalizedText : `${normalizedText}Z`
+  );
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDateTime(value) {
+  const date = parseBackendTimestamp(value);
+
+  if (!date) return 'No precisa';
+
+  return new Intl.DateTimeFormat('es-PE', {
+    timeZone: PERU_TIME_ZONE,
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
-  });
+    minute: '2-digit',
+    hour12: true
+  }).format(date);
 }
 
 export default SecurityAdmin;

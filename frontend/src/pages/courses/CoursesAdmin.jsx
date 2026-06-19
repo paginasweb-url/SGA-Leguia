@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Edit3,
-  Eye,
   GraduationCap,
   LayoutGrid,
   Loader2,
@@ -17,6 +16,8 @@ import {
   Users,
   X
 } from 'lucide-react';
+
+import toast from 'react-hot-toast';
 
 import {
   createCourse,
@@ -65,6 +66,21 @@ function CoursesAdmin() {
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [confirmModal, setConfirmModal] = useState(null);
+  useEffect(() => {
+    if (!error) return;
+
+    toast.error(error);
+    setError('');
+  }, [error]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    toast.success(successMessage);
+    setSuccessMessage('');
+  }, [successMessage]);
 
   const loadData = async ({ silent = false } = {}) => {
     try {
@@ -181,6 +197,22 @@ function CoursesAdmin() {
     });
   };
 
+  const closeCourseModal = () => {
+    setShowCreateCourse(false);
+    setSelectedCourse(null);
+    setCourseForm({ nombre: '' });
+    setAssignmentForm({
+      docente_id: '',
+      aula_id: ''
+    });
+    setError('');
+    setSuccessMessage('');
+  };
+
+  const closeConfirmModal = () => {
+    setConfirmModal(null);
+  };
+
   const handleSelectCourse = (course) => {
     setSelectedCourse(course);
     setShowCreateCourse(false);
@@ -242,7 +274,7 @@ function CoursesAdmin() {
     }
   };
 
-  const handleDeleteCourse = async (course) => {
+  const handleDeleteCourse = (course) => {
     const courseAssignments = assignmentsByCourse[Number(course.id)] || [];
 
     if (courseAssignments.length > 0) {
@@ -252,34 +284,38 @@ function CoursesAdmin() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `¿Deseas eliminar el curso ${course.nombre}?`
-    );
+    setConfirmModal({
+      type: 'danger',
+      title: 'Eliminar curso',
+      description: `¿Deseas eliminar el curso ${course.nombre}? Esta acción no se podrá deshacer.`,
+      confirmText: 'Eliminar curso',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        try {
+          setError('');
+          setSuccessMessage('');
+          setDeletingCourseId(course.id);
 
-    if (!confirmed) return;
+          await deleteCourse(course.id);
 
-    try {
-      setError('');
-      setSuccessMessage('');
-      setDeletingCourseId(course.id);
+          setSuccessMessage('Curso eliminado correctamente.');
 
-      await deleteCourse(course.id);
+          if (selectedCourse?.id === course.id) {
+            setSelectedCourse(null);
+          }
 
-      setSuccessMessage('Curso eliminado correctamente.');
-
-      if (selectedCourse?.id === course.id) {
-        setSelectedCourse(null);
+          await loadData({ silent: true });
+        } catch (error) {
+          setError(
+            error?.response?.data?.error ||
+            'No se pudo eliminar el curso.'
+          );
+        } finally {
+          setDeletingCourseId(null);
+          closeConfirmModal();
+        }
       }
-
-      await loadData({ silent: true });
-    } catch (error) {
-      setError(
-        error?.response?.data?.error ||
-        'No se pudo eliminar el curso.'
-      );
-    } finally {
-      setDeletingCourseId(null);
-    }
+    });
   };
 
   const handleCreateAssignment = async (e) => {
@@ -325,31 +361,35 @@ function CoursesAdmin() {
     }
   };
 
-  const handleDeleteAssignment = async (assignment) => {
-    const confirmed = window.confirm(
-      `¿Deseas eliminar la asignación de ${assignment.docente} en ${assignment.grado} ${assignment.seccion}?`
-    );
+  const handleDeleteAssignment = (assignment) => {
+    setConfirmModal({
+      type: 'danger',
+      title: 'Eliminar asignación',
+      description: `¿Deseas eliminar la asignación de ${assignment.docente} en ${assignment.grado} ${assignment.seccion} - ${assignment.turno}?`,
+      confirmText: 'Eliminar asignación',
+      cancelText: 'Cancelar',
+      onConfirm: async () => {
+        try {
+          setError('');
+          setSuccessMessage('');
+          setDeletingAssignmentId(assignment.id);
 
-    if (!confirmed) return;
+          await deleteTeacherCourse(assignment.id);
 
-    try {
-      setError('');
-      setSuccessMessage('');
-      setDeletingAssignmentId(assignment.id);
+          setSuccessMessage('Asignación eliminada correctamente.');
 
-      await deleteTeacherCourse(assignment.id);
-
-      setSuccessMessage('Asignación eliminada correctamente.');
-
-      await loadData({ silent: true });
-    } catch (error) {
-      setError(
-        error?.response?.data?.error ||
-        'No se pudo eliminar la asignación.'
-      );
-    } finally {
-      setDeletingAssignmentId(null);
-    }
+          await loadData({ silent: true });
+        } catch (error) {
+          setError(
+            error?.response?.data?.error ||
+            'No se pudo eliminar la asignación.'
+          );
+        } finally {
+          setDeletingAssignmentId(null);
+          closeConfirmModal();
+        }
+      }
+    });
   };
 
   const handleAssignmentChange = (name, value) => {
@@ -416,14 +456,6 @@ function CoursesAdmin() {
         </div>
       </section>
 
-      {error && (
-        <MessageBox type="error" message={error} onClose={() => setError('')} />
-      )}
-
-      {successMessage && (
-        <MessageBox type="success" message={successMessage} onClose={() => setSuccessMessage('')} />
-      )}
-
       <section className="grid grid-cols-1 md:grid-cols-4 gap-5">
         <CounterCard
           icon={BookOpen}
@@ -472,72 +504,154 @@ function CoursesAdmin() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-        <div className="xl:col-span-7 bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-extrabold text-brand-950">
-                Listado de cursos
-              </h2>
+      <section className="bg-white border border-slate-200 rounded-3xl shadow-soft overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-extrabold text-brand-950">
+              Listado de cursos
+            </h2>
 
-              <p className="text-sm text-slate-500 mt-1">
-                Selecciona un curso para ver o crear asignaciones.
-              </p>
-            </div>
-
-            <span className="hidden sm:inline-flex rounded-full px-3 py-1 text-xs font-extrabold bg-brand-50 text-brand-900 border border-brand-100">
-              {filteredCourses.length} resultado(s)
-            </span>
+            <p className="text-sm text-slate-500 mt-1">
+              Gestiona cursos y abre la edición en una ventana emergente.
+            </p>
           </div>
 
-          <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[360px] overflow-y-auto">
-            {filteredCourses.length > 0 ? (
-              filteredCourses.map((course) => (
-                <CourseRow
-                  key={course.id}
-                  course={course}
-                  assignmentCount={(assignmentsByCourse[Number(course.id)] || []).length}
-                  active={selectedCourse?.id === course.id}
-                  deleting={deletingCourseId === course.id}
-                  onSelect={() => handleSelectCourse(course)}
-                  onDelete={() => handleDeleteCourse(course)}
-                />
-              ))
-            ) : (
-              <EmptyBlock text="No se encontraron cursos con los filtros aplicados." />
-            )}
-          </div>
+          <span className="hidden sm:inline-flex rounded-full px-3 py-1 text-xs font-extrabold bg-brand-50 text-brand-900 border border-brand-100">
+            {filteredCourses.length} resultado(s)
+          </span>
         </div>
 
-        <div className="xl:col-span-5">
-          {showCreateCourse || selectedCourse ? (
-            <CourseDetailPanel
-              mode={showCreateCourse ? 'create' : 'edit'}
-              selectedCourse={selectedCourse}
-              courseForm={courseForm}
-              onCourseNameChange={(value) =>
-                setCourseForm({
-                  nombre: value
-                })
-              }
-              onSaveCourse={handleSaveCourse}
-              savingCourse={savingCourse}
-              assignments={selectedCourseAssignments}
-              assignmentForm={assignmentForm}
-              teachers={activeTeachers}
-              classrooms={classrooms}
-              savingAssignment={savingAssignment}
-              deletingAssignmentId={deletingAssignmentId}
-              onAssignmentChange={handleAssignmentChange}
-              onCreateAssignment={handleCreateAssignment}
-              onDeleteAssignment={handleDeleteAssignment}
-            />
+        <div className="divide-y divide-slate-100 max-h-[calc(100vh-360px)] min-h-[420px] overflow-y-auto">
+          {filteredCourses.length > 0 ? (
+            filteredCourses.map((course) => (
+              <CourseRow
+                key={course.id}
+                course={course}
+                assignmentCount={(assignmentsByCourse[Number(course.id)] || []).length}
+                active={selectedCourse?.id === course.id}
+                deleting={deletingCourseId === course.id}
+                onSelect={() => handleSelectCourse(course)}
+                onDelete={() => handleDeleteCourse(course)}
+              />
+            ))
           ) : (
-            <EmptyDetail />
+            <EmptyBlock text="No se encontraron cursos con los filtros aplicados." />
           )}
         </div>
       </section>
+
+      {(showCreateCourse || selectedCourse) && (
+        <CourseModal onClose={closeCourseModal}>
+          <CourseDetailPanel
+            mode={showCreateCourse ? 'create' : 'edit'}
+            selectedCourse={selectedCourse}
+            courseForm={courseForm}
+            onCourseNameChange={(value) =>
+              setCourseForm({
+                nombre: value
+              })
+            }
+            onSaveCourse={handleSaveCourse}
+            savingCourse={savingCourse}
+            assignments={selectedCourseAssignments}
+            assignmentForm={assignmentForm}
+            teachers={activeTeachers}
+            classrooms={classrooms}
+            savingAssignment={savingAssignment}
+            deletingAssignmentId={deletingAssignmentId}
+            onAssignmentChange={handleAssignmentChange}
+            onCreateAssignment={handleCreateAssignment}
+            onDeleteAssignment={handleDeleteAssignment}
+          />
+        </CourseModal>
+      )}
+
+      {confirmModal && (
+        <ConfirmModal
+          config={confirmModal}
+          onClose={closeConfirmModal}
+        />
+      )}
     </main>
+  );
+}
+
+function CourseModal({ children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end lg:items-center justify-center p-0 lg:p-6">
+      <section className="relative w-full lg:max-w-5xl max-h-[92vh] overflow-y-auto rounded-t-3xl lg:rounded-3xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function ConfirmModal({ config, onClose }) {
+  const danger = config.type === 'danger';
+
+  const handleConfirm = async () => {
+    if (config.onConfirm) {
+      await config.onConfirm();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <section className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6">
+        <div className="flex items-start gap-4">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+              danger
+                ? 'bg-red-50 text-danger'
+                : 'bg-brand-50 text-brand-900'
+            }`}
+          >
+            {danger ? <Trash2 size={24} /> : <AlertCircle size={24} />}
+          </div>
+
+          <div className="min-w-0">
+            <h2 className="text-xl font-extrabold text-brand-950">
+              {config.title || 'Confirmar acción'}
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-2">
+              {config.description || '¿Deseas continuar?'}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-extrabold hover:bg-slate-100 transition"
+          >
+            {config.cancelText || 'Cancelar'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className={`inline-flex items-center justify-center px-4 py-3 rounded-xl font-extrabold transition ${
+              danger
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-brand-900 text-white hover:bg-brand-800'
+            }`}
+          >
+            {config.confirmText || 'Confirmar'}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -551,7 +665,7 @@ function CourseRow({
 }) {
   return (
     <div className={`p-5 hover:bg-slate-50 transition ${active ? 'bg-brand-50' : ''}`}>
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_260px_120px] lg:items-center gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_260px_180px] lg:items-center gap-4">
         <button
           type="button"
           onClick={onSelect}
@@ -581,33 +695,25 @@ function CourseRow({
           <button
             type="button"
             onClick={onSelect}
-            className="p-2 text-brand-900 hover:bg-brand-50 rounded-xl transition"
-            title="Ver detalle"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-brand-50 text-brand-900 font-extrabold text-xs hover:bg-brand-100 transition"
           >
-            <Eye size={18} />
-          </button>
-
-          <button
-            type="button"
-            onClick={onSelect}
-            className="p-2 text-slate-600 hover:text-brand-900 hover:bg-brand-50 rounded-xl transition"
-            title="Editar"
-          >
-            <Edit3 size={18} />
+            <Edit3 size={16} />
+            Editar
           </button>
 
           <button
             type="button"
             onClick={onDelete}
             disabled={deleting || assignmentCount > 0}
-            className="p-2 text-slate-600 hover:text-danger hover:bg-red-50 rounded-xl transition disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-red-50 text-danger font-extrabold text-xs hover:bg-red-100 disabled:opacity-40 transition"
             title={assignmentCount > 0 ? 'Elimina asignaciones primero' : 'Eliminar curso'}
           >
             {deleting ? (
-              <Loader2 size={18} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : (
-              <Trash2 size={18} />
+              <Trash2 size={16} />
             )}
+            Eliminar
           </button>
         </div>
       </div>
@@ -640,7 +746,7 @@ function CourseDetailPanel({
         onSubmit={onSaveCourse}
         className="bg-white border border-slate-200 rounded-3xl shadow-soft p-6 space-y-5"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 pr-10">
           <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center">
             <GraduationCap size={23} />
           </div>
@@ -888,56 +994,12 @@ function SelectField({
   );
 }
 
-function MessageBox({ type, message, onClose }) {
-  const success = type === 'success';
-
-  return (
-    <div className={`${success ? 'bg-green-50 border-green-100 text-success' : 'bg-red-50 border-red-100 text-danger'} border rounded-2xl p-4 flex items-start justify-between gap-3`}>
-      <div className="flex gap-3">
-        {success ? (
-          <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
-        ) : (
-          <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        )}
-
-        <p className="text-sm font-semibold">
-          {message}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="font-extrabold"
-      >
-        <X size={18} />
-      </button>
-    </div>
-  );
-}
-
 function EmptyBlock({ text }) {
   return (
     <div className="p-8 text-center">
       <BookOpen className="mx-auto text-slate-300" size={42} />
       <p className="text-sm text-slate-500 mt-3">
         {text}
-      </p>
-    </div>
-  );
-}
-
-function EmptyDetail() {
-  return (
-    <div className="bg-white border border-slate-200 rounded-3xl shadow-soft p-8 text-center">
-      <BookOpen className="mx-auto text-slate-300" size={46} />
-
-      <h2 className="text-xl font-extrabold text-brand-950 mt-4">
-        Selecciona un curso
-      </h2>
-
-      <p className="text-sm text-slate-500 mt-2">
-        Aquí podrás editar el curso y gestionar sus asignaciones docente-curso-aula.
       </p>
     </div>
   );
