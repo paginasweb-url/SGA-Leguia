@@ -63,6 +63,8 @@ import GuardianChildren from './pages/guardians/GuardianChildren';
 
 import AuxiliaryStudents from './pages/students/AuxiliaryStudents';
 
+
+
 const protectedElement = (element, roles = null) => {
   return (
     <ProtectedRoute>
@@ -574,7 +576,9 @@ function App() {
           )}
         />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+      
+      
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
   );
