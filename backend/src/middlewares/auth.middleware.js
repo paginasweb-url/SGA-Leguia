@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { upload } from '../middlewares/upload.middleware.js';
 
 dotenv.config();
 

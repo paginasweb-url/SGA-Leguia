@@ -6,8 +6,6 @@ dotenv.config();
 const { Pool, types } = pkg;
 
 // OID 1114 = timestamp without time zone
-// Supabase/PostgreSQL suele guardar estos timestamps en UTC.
-// Evitamos que Node los interprete como hora local del servidor o de la PC.
 types.setTypeParser(1114, (value) => {
   if (!value) return value;
 
@@ -15,6 +13,9 @@ types.setTypeParser(1114, (value) => {
 
   return text.endsWith('Z') ? text : `${text}Z`;
 });
+
+// OID 1082 = date
+types.setTypeParser(1082, (value) => value);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

@@ -8,13 +8,21 @@ import {
   getStudentAttendance,
   getClassroomAttendanceSummary,
   getAttendanceClassrooms,
-  getMyAttendance
+  getMyAttendance,
+  createAttendanceJustificationRequest,
+  getAttendanceJustificationRequests,
+  reviewAttendanceJustificationRequest,
+  downloadAttendanceJustificationDocument,
+  getAttendanceAlertRequests,
+  resolveAttendanceAlertRequest
 } from '../controllers/attendance.controller.js';
 
 import {
   verifyToken,
   authorizeRoles
 } from '../middlewares/auth.middleware.js';
+
+import { upload } from '../middlewares/upload.middleware.js';
 
 const router = express.Router();
 
@@ -30,6 +38,49 @@ router.get(
   verifyToken,
   authorizeRoles('Docente', 'Estudiante', 'Apoderado'),
   getMyAttendance
+);
+
+router.post(
+  '/justifications',
+  verifyToken,
+  authorizeRoles('Apoderado', 'Auxiliar'),
+  upload.single('documento'),
+  createAttendanceJustificationRequest
+);
+
+router.get(
+  '/justifications',
+  verifyToken,
+  authorizeRoles('Apoderado', 'Auxiliar', 'Director', 'Administrativo'),
+  getAttendanceJustificationRequests
+);
+
+router.patch(
+  '/justifications/:id/review',
+  verifyToken,
+  authorizeRoles('Auxiliar', 'Director', 'Administrativo'),
+  reviewAttendanceJustificationRequest
+);
+
+router.get(
+  '/justifications/:id/download',
+  verifyToken,
+  authorizeRoles('Apoderado', 'Auxiliar', 'Director', 'Administrativo'),
+  downloadAttendanceJustificationDocument
+);
+
+router.get(
+  '/alerts',
+  verifyToken,
+  authorizeRoles('Auxiliar', 'Director', 'Administrativo'),
+  getAttendanceAlertRequests
+);
+
+router.patch(
+  '/alerts/:id/resolve',
+  verifyToken,
+  authorizeRoles('Auxiliar', 'Director', 'Administrativo'),
+  resolveAttendanceAlertRequest
 );
 
 router.get(

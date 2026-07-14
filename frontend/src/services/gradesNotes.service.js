@@ -128,3 +128,31 @@ export const getStudentsAtRisk = async ({ aulaId, periodoId }) => {
 
   return response.data;
 };
+
+export const getAcademicAlerts = async (estado = 'activa') => {
+  const params = {};
+
+  if (estado && estado !== 'todos') {
+    params.estado = estado;
+  }
+
+  const response = await api.get('/grades-notes/alerts', {
+    params
+  });
+
+  return response.data;
+};
+
+export const resolveAcademicAlert = async ({
+  id,
+  observacion
+}) => {
+  const response = await api.patch(
+    `/grades-notes/alerts/${id}/resolve`,
+    {
+      observacion
+    }
+  );
+
+  return response.data;
+};

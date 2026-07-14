@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  AlertTriangle,
   Bell,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
+  GraduationCap,
   Loader2,
+  Megaphone,
   RefreshCw
 } from 'lucide-react';
 
@@ -12,6 +16,11 @@ import {
   getMyAnnouncements,
   markAnnouncementAsRead
 } from '../services/announcements.service';
+
+import {
+  getMyNotifications,
+  markNotificationAsRead
+} from '../services/notifications.service';
 
 import { getRole } from '../utils/storage';
 
@@ -24,6 +33,40 @@ const announcementsPathByRole = {
   Apoderado: '/guardian/announcements'
 };
 
+const attendancePathByRole = {
+  Director: '/director/attendance',
+  Administrativo: '/admin/attendance',
+  Auxiliar: '/auxiliary/attendance',
+  Estudiante: '/student/attendance',
+  Apoderado: '/guardian/attendance'
+};
+
+const gradesPathByRole = {
+  Director: '/director/grades',
+  Administrativo: '/admin/grades',
+  Docente: '/teacher/grades',
+  Estudiante: '/student/grades',
+  Apoderado: '/guardian/grades'
+};
+
+const calendarPathByRole = {
+  Director: '/director/calendar',
+  Administrativo: '/admin/calendar',
+  Docente: '/teacher/calendar',
+  Auxiliar: '/auxiliary/calendar',
+  Estudiante: '/student/calendar',
+  Apoderado: '/guardian/calendar'
+};
+
+const reinforcementPathByRole = {
+  Director: '/director/reinforcements',
+  Administrativo: '/admin/reinforcements',
+  Auxiliar: '/auxiliary/reinforcements',
+  Docente: '/teacher/reinforcements',
+  Estudiante: '/student/reinforcements',
+  Apoderado: '/guardian/reinforcements'
+};
+
 const readRoles = ['Docente', 'Auxiliar', 'Estudiante', 'Apoderado'];
 
 function NotificationsDropdown() {
@@ -33,34 +76,73 @@ function NotificationsDropdown() {
 
   const [open, setOpen] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [markingId, setMarkingId] = useState(null);
+  const [markingKey, setMarkingKey] = useState(null);
   const [error, setError] = useState('');
 
   const targetPath = announcementsPathByRole[role] || '/dashboard';
+  const attendancePath = attendancePathByRole[role] || '/dashboard';
+  const gradesPath = gradesPathByRole[role] || '/dashboard';
+  const calendarPath = calendarPathByRole[role] || '/dashboard';
+  const reinforcementPath = reinforcementPathByRole[role] || '/dashboard';
   const canConfirmRead = readRoles.includes(role);
 
+  const normalizedItems = useMemo(() => {
+    const announcementItems = announcements.map((item) => ({
+      id: item.id,
+      source: 'announcement',
+      title: item.titulo || 'Aviso',
+      content: item.contenido || 'Sin contenido adicional.',
+      date: item.fecha || item.created_at,
+      unread: canConfirmRead ? !item.leido : false,
+      raw: item
+    }));
+
+    const notificationItems = notifications.map((item) => ({
+      id: item.id,
+      source: 'notification',
+      title: getNotificationTitle(item),
+      content: item.mensaje || 'Sin mensaje registrado.',
+      date: item.fecha || item.created_at,
+      unread: item.estado !== 'leida',
+      raw: item
+    }));
+
+    return [...announcementItems, ...notificationItems]
+      .sort((a, b) => {
+        const dateA = parseBackendTimestamp(a.date)?.getTime() || 0;
+        const dateB = parseBackendTimestamp(b.date)?.getTime() || 0;
+
+        return dateB - dateA;
+      });
+  }, [announcements, notifications, canConfirmRead]);
+
   const unreadCount = useMemo(() => {
-    if (!canConfirmRead) return 0;
+    return normalizedItems.filter((item) => item.unread).length;
+  }, [normalizedItems]);
 
-    return announcements.filter((item) => !item.leido).length;
-  }, [announcements, canConfirmRead]);
+  const recentItems = useMemo(() => {
+    return normalizedItems.slice(0, 6);
+  }, [normalizedItems]);
 
-  const recentAnnouncements = useMemo(() => {
-    return announcements.slice(0, 6);
-  }, [announcements]);
-
-  const loadAnnouncements = async () => {
+  const loadNotificationCenter = async () => {
     try {
       setError('');
       setLoading(true);
 
-      const response = await getMyAnnouncements();
-      setAnnouncements(response.data || []);
+      const [announcementsResponse, notificationsResponse] = await Promise.all([
+        getMyAnnouncements(),
+        getMyNotifications(10)
+      ]);
+
+      setAnnouncements(announcementsResponse.data || []);
+      setNotifications(notificationsResponse.data || []);
+
     } catch (error) {
       setError(
         error?.response?.data?.error ||
-        'No se pudieron cargar los avisos.'
+        'No se pudieron cargar las notificaciones.'
       );
     } finally {
       setLoading(false);
@@ -68,7 +150,7 @@ function NotificationsDropdown() {
   };
 
   useEffect(() => {
-    loadAnnouncements();
+    loadNotificationCenter();
   }, []);
 
   useEffect(() => {
@@ -91,15 +173,17 @@ function NotificationsDropdown() {
     setOpen((prev) => !prev);
 
     if (!open) {
-      loadAnnouncements();
+      loadNotificationCenter();
     }
   };
 
-  const handleMarkAsRead = async (announcement) => {
+  const handleMarkAnnouncementAsRead = async (announcement) => {
     if (!announcement?.id || announcement.leido || !canConfirmRead) return;
 
+    const key = `announcement-${announcement.id}`;
+
     try {
-      setMarkingId(announcement.id);
+      setMarkingKey(key);
 
       await markAnnouncementAsRead(announcement.id);
 
@@ -114,30 +198,96 @@ function NotificationsDropdown() {
             : item
         )
       );
+
     } catch (error) {
       setError(
         error?.response?.data?.error ||
         'No se pudo confirmar la lectura.'
       );
     } finally {
-      setMarkingId(null);
+      setMarkingKey(null);
     }
   };
 
-  const handleOpenAnnouncement = async (announcement) => {
-    if (!announcement?.id) return;
+  const handleMarkNotificationAsRead = async (notification) => {
+    if (!notification?.id || notification.estado === 'leida') return;
 
-    if (canConfirmRead && !announcement.leido) {
-      await handleMarkAsRead(announcement);
+    const key = `notification-${notification.id}`;
+
+    try {
+      setMarkingKey(key);
+
+      await markNotificationAsRead(notification.id);
+
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === notification.id
+            ? {
+                ...item,
+                estado: 'leida'
+              }
+            : item
+        )
+      );
+
+    } catch (error) {
+      setError(
+        error?.response?.data?.error ||
+        'No se pudo marcar la notificación como leída.'
+      );
+    } finally {
+      setMarkingKey(null);
+    }
+  };
+
+  const handleOpenItem = async (item) => {
+    if (!item?.id) return;
+
+    if (item.source === 'announcement') {
+      if (canConfirmRead && !item.raw?.leido) {
+        await handleMarkAnnouncementAsRead(item.raw);
+      }
+
+      setOpen(false);
+
+      navigate(targetPath, {
+        state: {
+          openAnnouncementId: item.id
+        }
+      });
+
+      return;
+    }
+
+    if (item.source === 'notification') {
+    if (item.raw?.estado !== 'leida') {
+      await handleMarkNotificationAsRead(item.raw);
     }
 
     setOpen(false);
 
-    navigate(targetPath, {
-      state: {
-        openAnnouncementId: announcement.id
-      }
-    });
+    if (item.raw?.tipo === 'alerta_academica') {
+      navigate(gradesPath);
+      return;
+    }
+
+    if (item.raw?.tipo === 'alerta_asistencia') {
+      navigate(attendancePath);
+      return;
+    }
+
+    if (item.raw?.tipo === 'evento_calendario') {
+      navigate(calendarPath);
+      return;
+    }
+
+    if (item.raw?.tipo === 'reforzamiento_academico') {
+      navigate(reinforcementPath);
+      return;
+    }
+
+    navigate('/dashboard');
+  }
   };
 
   return (
@@ -146,7 +296,7 @@ function NotificationsDropdown() {
         type="button"
         onClick={handleToggle}
         className="relative w-10 h-10 rounded-2xl border border-slate-200 bg-white text-brand-950 flex items-center justify-center hover:bg-brand-50 hover:border-brand-100 transition"
-        aria-label="Abrir avisos"
+        aria-label="Abrir notificaciones"
       >
         <Bell size={18} />
 
@@ -165,28 +315,26 @@ function NotificationsDropdown() {
             <div className="relative flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-extrabold text-gold-500 uppercase tracking-[0.18em]">
-                  Centro de avisos
+                  Centro de notificaciones
                 </p>
 
                 <h3 className="text-lg font-extrabold mt-1">
-                  Avisos recientes
+                  Avisos y alertas recientes
                 </h3>
 
                 <p className="text-sm text-blue-100 mt-1">
-                  {canConfirmRead
-                    ? unreadCount > 0
-                      ? `${unreadCount} aviso(s) pendiente(s) de lectura.`
-                      : 'No tienes avisos pendientes.'
-                    : 'Revisa los avisos publicados recientemente.'}
+                  {unreadCount > 0
+                    ? `${unreadCount} notificación(es) pendiente(s).`
+                    : 'No tienes notificaciones pendientes.'}
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={loadAnnouncements}
+                onClick={loadNotificationCenter}
                 disabled={loading}
                 className="w-9 h-9 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/20 disabled:opacity-60 transition shrink-0"
-                aria-label="Actualizar avisos"
+                aria-label="Actualizar notificaciones"
               >
                 <RefreshCw
                   size={17}
@@ -200,8 +348,9 @@ function NotificationsDropdown() {
             {loading ? (
               <div className="p-8 text-center">
                 <Loader2 className="mx-auto animate-spin text-brand-900" size={30} />
+
                 <p className="text-sm text-slate-500 font-semibold mt-3">
-                  Cargando avisos...
+                  Cargando notificaciones...
                 </p>
               </div>
             ) : error ? (
@@ -210,66 +359,83 @@ function NotificationsDropdown() {
                   {error}
                 </p>
               </div>
-            ) : recentAnnouncements.length > 0 ? (
-              recentAnnouncements.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleOpenAnnouncement(item)}
-                  className="w-full text-left p-4 sm:p-5 hover:bg-slate-50 transition"
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 ${
-                        canConfirmRead && item.leido
-                          ? 'bg-slate-100 text-slate-500'
-                          : 'bg-brand-50 text-brand-900'
-                      }`}
-                    >
-                      {markingId === item.id ? (
-                        <Loader2 size={20} className="animate-spin" />
-                      ) : canConfirmRead && item.leido ? (
-                        <CheckCircle2 size={21} />
-                      ) : (
-                        <Bell size={21} />
-                      )}
-                    </div>
+            ) : recentItems.length > 0 ? (
+              recentItems.map((item) => {
+                const key = `${item.source}-${item.id}`;
+                const Icon =
+                  item.source === 'notification'
+                    ? item.raw?.tipo === 'alerta_academica'
+                      ? GraduationCap
+                      : item.raw?.tipo === 'evento_calendario'
+                        ? CalendarDays
+                        : item.raw?.tipo === 'reforzamiento_academico'
+                          ? GraduationCap
+                          : AlertTriangle
+                    : Megaphone;
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-extrabold text-brand-950 line-clamp-1 text-sm sm:text-base">
-                          {item.titulo || 'Aviso'}
-                        </p>
-
-                        {canConfirmRead && (
-                          <span
-                            className={`shrink-0 inline-flex rounded-full px-2.5 py-1 text-[10px] sm:text-[11px] font-extrabold border ${
-                              item.leido
-                                ? 'bg-green-50 text-success border-green-100'
-                                : 'bg-yellow-50 text-warning border-yellow-100'
-                            }`}
-                          >
-                            {item.leido ? 'Leído' : 'Pendiente'}
-                          </span>
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleOpenItem(item)}
+                    className="w-full text-left p-4 sm:p-5 hover:bg-slate-50 transition"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                          item.unread
+                            ? item.source === 'notification'
+                              ? 'bg-red-50 text-danger'
+                              : 'bg-brand-50 text-brand-900'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {markingKey === key ? (
+                          <Loader2 size={20} className="animate-spin" />
+                        ) : item.unread ? (
+                          <Icon size={21} />
+                        ) : (
+                          <CheckCircle2 size={21} />
                         )}
                       </div>
 
-                      <p className="text-sm text-slate-500 mt-1 line-clamp-2">
-                        {item.contenido || 'Sin contenido adicional.'}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-extrabold text-brand-950 line-clamp-1 text-sm sm:text-base">
+                            {item.title}
+                          </p>
 
-                      <p className="text-xs text-slate-400 mt-2">
-                        {formatDateTime(item.fecha || item.created_at)}
-                      </p>
+                          <span
+                            className={`shrink-0 inline-flex rounded-full px-2.5 py-1 text-[10px] sm:text-[11px] font-extrabold border ${
+                              item.unread
+                                ? item.source === 'notification'
+                                  ? 'bg-red-50 text-danger border-red-100'
+                                  : 'bg-yellow-50 text-warning border-yellow-100'
+                                : 'bg-green-50 text-success border-green-100'
+                            }`}
+                          >
+                            {item.unread ? 'Pendiente' : 'Leído'}
+                          </span>
+                        </div>
+
+                        <p className="text-sm text-slate-500 mt-1 line-clamp-2">
+                          {item.content}
+                        </p>
+
+                        <p className="text-xs text-slate-400 mt-2">
+                          {formatDateTime(item.date)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                );
+              })
             ) : (
               <div className="p-8 text-center">
                 <Bell className="mx-auto text-slate-300" size={38} />
+
                 <p className="text-sm text-slate-500 mt-3">
-                  No hay avisos disponibles.
+                  No hay notificaciones disponibles.
                 </p>
               </div>
             )}
@@ -289,6 +455,26 @@ function NotificationsDropdown() {
       )}
     </div>
   );
+}
+
+function getNotificationTitle(item) {
+  if (item.tipo === 'alerta_asistencia') {
+    return 'Alerta de asistencia';
+  }
+
+  if (item.tipo === 'alerta_academica') {
+    return 'Alerta académica';
+  }
+
+  if (item.tipo === 'evento_calendario') {
+    return 'Evento de calendario';
+  }
+
+  if (item.tipo === 'reforzamiento_academico') {
+    return 'Reforzamiento académico';
+  }
+
+  return 'Notificación';
 }
 
 const PERU_TIME_ZONE = 'America/Lima';

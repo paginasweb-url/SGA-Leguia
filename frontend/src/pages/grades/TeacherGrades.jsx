@@ -24,6 +24,8 @@ import {
   saveBimesterGrades
 } from '../../services/gradesNotes.service';
 
+import AcademicAlertsPanel from '../../components/AcademicAlertsPanel';
+
 function getArray(response) {
   if (Array.isArray(response?.data)) return response.data;
   if (Array.isArray(response)) return response;
@@ -68,6 +70,8 @@ function TeacherGrades() {
 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  const [academicAlertsRefreshKey, setAcademicAlertsRefreshKey] = useState(0);
 
   const loadInitialData = async () => {
     try {
@@ -347,7 +351,36 @@ function TeacherGrades() {
         throw new Error(response?.error || 'No se pudieron guardar las notas.');
         }
 
-        setSuccessMessage('Notas guardadas correctamente.');
+        const generatedAlerts = Number(
+          response.data?.alertas_academicas_generadas || 0
+        );
+
+        const resolvedAlerts = Number(
+          response.data?.alertas_academicas_resueltas || 0
+        );
+
+        const alertMessageParts = [];
+
+        if (generatedAlerts > 0) {
+          alertMessageParts.push(
+            `Se generó ${generatedAlerts} alerta(s) académica(s).`
+          );
+        }
+
+        if (resolvedAlerts > 0) {
+          alertMessageParts.push(
+            `Se resolvió ${resolvedAlerts} alerta(s) académica(s).`
+          );
+        }
+
+        setSuccessMessage(
+          alertMessageParts.length > 0
+            ? `Notas guardadas correctamente. ${alertMessageParts.join(' ')}`
+            : 'Notas guardadas correctamente.'
+        );
+
+        setAcademicAlertsRefreshKey((prev) => prev + 1);
+
         await loadGradeSheet();
     } catch (error) {
       setError(
@@ -409,6 +442,12 @@ function TeacherGrades() {
         <CounterCard icon={ClipboardList} label="Con nota" value={counters.graded} description="Notas registradas" />
         <CounterCard icon={AlertCircle} label="Pendientes" value={counters.pending} description="Faltan por registrar" />
       </section>
+
+      <AcademicAlertsPanel
+        refreshKey={academicAlertsRefreshKey}
+        title="Alertas académicas del docente"
+        description="Alertas generadas automáticamente por notas C en tus cursos asignados."
+      />
 
       <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

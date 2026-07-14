@@ -4,6 +4,9 @@ import {
   CheckCircle2,
   Clock3,
   FileCheck2,
+  FileText,
+  Send,
+  Upload,
   Loader2,
   RefreshCw,
   UserCheck,
@@ -13,7 +16,11 @@ import {
 
 import toast from 'react-hot-toast';
 
-import { getMyAttendance } from '../../services/attendance.service';
+import {
+  createAttendanceJustification,
+  getAttendanceJustifications,
+  getMyAttendance
+} from '../../services/attendance.service';
 import { getRole, getStoredUser } from '../../utils/storage';
 
 const stateConfig = {
@@ -43,6 +50,8 @@ function MyAttendance() {
   const role = getRole();
   const user = getStoredUser();
 
+  const canRequestJustification = role === 'Apoderado';
+
   const [attendance, setAttendance] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState('todos');
 
@@ -55,6 +64,10 @@ function MyAttendance() {
   const [error, setError] = useState('');
 
   const [selectedAttendanceDetail, setSelectedAttendanceDetail] = useState(null);
+
+  const [justifications, setJustifications] = useState([]);
+  const [selectedJustificationAttendance, setSelectedJustificationAttendance] = useState(null);
+  const [sendingJustification, setSendingJustification] = useState(false);
 
   const getAttendanceQueryParams = () => {
     if (filterMode === 'month') {
@@ -96,8 +109,16 @@ function MyAttendance() {
         return;
       }
 
-      const response = await getMyAttendance(getAttendanceQueryParams());
-      setAttendance((response.data || []).filter((item) => item.fecha));
+      const [attendanceResponse, justificationsResponse] = await Promise.all([
+        getMyAttendance(getAttendanceQueryParams()),
+        canRequestJustification
+          ? getAttendanceJustifications()
+          : Promise.resolve({ data: [] })
+      ]);
+
+      setAttendance((attendanceResponse.data || []).filter((item) => item.fecha));
+      setJustifications(justificationsResponse.data || []);
+
     } catch (error) {
       setError(
         error?.response?.data?.error ||
@@ -172,6 +193,18 @@ function MyAttendance() {
     );
   }, [visibleAttendance]);
 
+  const justificationsByAttendance = useMemo(() => {
+    const map = new Map();
+
+    justifications.forEach((item) => {
+      if (!item.asistencia_id) return;
+
+      map.set(Number(item.asistencia_id), item);
+    });
+
+    return map;
+  }, [justifications]);
+
   const groupedByMonth = useMemo(() => {
     const map = new Map();
 
@@ -197,6 +230,43 @@ function MyAttendance() {
   }, [visibleAttendance]);
 
   const pageText = getPageText(role);
+
+  const handleSubmitJustification = async ({
+  asistenciaId,
+  motivo,
+  documento
+}) => {
+  try {
+    setError('');
+    setSendingJustification(true);
+
+    if (!motivo || !motivo.trim()) {
+      setError('El motivo de la justificación es obligatorio.');
+      return;
+    }
+
+    const response = await createAttendanceJustification({
+      asistenciaId,
+      motivo: motivo.trim(),
+      documento
+    });
+
+    toast.success(response.message || 'Justificación enviada correctamente.');
+
+    setSelectedJustificationAttendance(null);
+    setSelectedAttendanceDetail(null);
+
+    await loadAttendance({ silent: true });
+
+  } catch (error) {
+    setError(
+      error?.response?.data?.error ||
+      'No se pudo enviar la justificación.'
+    );
+  } finally {
+    setSendingJustification(false);
+  }
+};
 
   if (loading) {
     return (
@@ -375,20 +445,49 @@ function MyAttendance() {
         <AttendanceDetailModal
           item={selectedAttendanceDetail}
           role={role}
+          justification={justificationsByAttendance.get(Number(selectedAttendanceDetail.id))}
+          onRequestJustification={setSelectedJustificationAttendance}
           onClose={() => setSelectedAttendanceDetail(null)}
+        />
+      )}
+
+      {selectedJustificationAttendance && (
+        <JustificationRequestModal
+          item={selectedJustificationAttendance}
+          sending={sendingJustification}
+          onClose={() => setSelectedJustificationAttendance(null)}
+          onSubmit={handleSubmitJustification}
         />
       )}
     </main>
   );
 }
 
-function AttendanceDetailModal({ item, role, onClose }) {
+function AttendanceDetailModal({
+  item,
+  role,
+  justification,
+  onRequestJustification,
+  onClose
+}) {
   const config = stateConfig[item.estado] || stateConfig.presente;
   const Icon = config.icon;
 
+  const canShowJustificationButton =
+    role === 'Apoderado' &&
+    item.estado === 'falta' &&
+    !justification &&
+    isWithinJustificationWindow(item.fecha);
+
+  const showExpiredMessage =
+    role === 'Apoderado' &&
+    item.estado === 'falta' &&
+    !justification &&
+    !isWithinJustificationWindow(item.fecha);
+
   return (
     <div className="fixed inset-0 z-[80] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
-      <section className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6">
+      <section className="relative bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 p-6 max-h-[92vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
@@ -435,7 +534,205 @@ function AttendanceDetailModal({ item, role, onClose }) {
               {item.observacion?.trim() || 'Sin observación registrada.'}
             </p>
           </div>
+
+          {justification && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+              <p className="text-xs font-extrabold text-blue-700 uppercase tracking-wide">
+                Justificación registrada
+              </p>
+
+              <p className="text-sm text-brand-950 mt-2 leading-relaxed">
+                Estado: <span className="font-extrabold capitalize">{justification.estado}</span>
+              </p>
+
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                {justification.motivo || 'Sin motivo registrado.'}
+              </p>
+
+              {justification.respuesta && (
+                <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                  Respuesta: {justification.respuesta}
+                </p>
+              )}
+            </div>
+          )}
+
+          {showExpiredMessage && (
+            <div className="rounded-2xl border border-yellow-100 bg-yellow-50 p-4">
+              <p className="text-sm font-semibold text-warning leading-relaxed">
+                Esta falta ya no puede justificarse desde el portal. Las justificaciones solo se envían el mismo día hasta las 6:00 p. m.
+              </p>
+            </div>
+          )}
+
+          {canShowJustificationButton && (
+            <button
+              type="button"
+              onClick={() => onRequestJustification(item)}
+              className="w-full inline-flex items-center justify-center gap-2 bg-brand-900 text-white px-5 py-3 rounded-xl font-extrabold hover:bg-brand-800 transition"
+            >
+              <FileText size={18} />
+              Justificar falta
+            </button>
+          )}
         </div>
+      </section>
+    </div>
+  );
+}
+
+function JustificationRequestModal({
+  item,
+  sending,
+  onClose,
+  onSubmit
+}) {
+  const [motivo, setMotivo] = useState('');
+  const [documento, setDocumento] = useState(null);
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    onSubmit({
+      asistenciaId: item.id,
+      motivo,
+      documento
+    });
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0] || null;
+
+    if (!file) {
+      setDocumento(null);
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      toast.error('El archivo no debe superar los 5 MB.');
+      event.target.value = '';
+      return;
+    }
+
+    setDocumento(file);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <section className="relative bg-white w-full sm:max-w-xl rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 max-h-[92vh] overflow-y-auto">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={sending}
+          className="absolute right-4 top-4 z-20 w-10 h-10 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100 flex items-center justify-center transition shadow-sm disabled:opacity-60"
+          aria-label="Cerrar modal"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="bg-brand-950 text-white p-6 rounded-t-3xl sm:rounded-t-3xl relative overflow-hidden">
+          <div className="absolute -top-20 -right-20 w-56 h-56 bg-gold-500/20 rounded-full blur-3xl" />
+
+          <div className="relative pr-10">
+            <p className="text-sm font-extrabold text-gold-500 uppercase tracking-[0.18em]">
+              Justificación de asistencia
+            </p>
+
+            <h2 className="text-2xl font-extrabold mt-2">
+              Enviar sustento de falta
+            </h2>
+
+            <p className="text-sm text-blue-100 mt-2">
+              {item.estudiante || 'Estudiante'} · {formatLongDate(item.fecha)}
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4">
+            <p className="text-sm font-semibold text-warning leading-relaxed">
+              La justificación será revisada por el Auxiliar, Director o personal administrativo. El archivo es opcional.
+            </p>
+          </div>
+
+          <label className="block">
+            <span className="block text-sm font-bold text-slate-700 mb-2">
+              Motivo de la justificación
+            </span>
+
+            <textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              rows={5}
+              placeholder="Describe el motivo de la falta..."
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-800 resize-none"
+            />
+
+            <p className="text-xs text-slate-500 mt-1">
+              Este campo es obligatorio.
+            </p>
+          </label>
+
+          <label className="block">
+            <span className="block text-sm font-bold text-slate-700 mb-2">
+              Archivo opcional
+            </span>
+
+            <div className="border border-dashed border-slate-300 rounded-2xl bg-slate-50 p-5">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-brand-50 text-brand-900 flex items-center justify-center shrink-0">
+                  <Upload size={22} />
+                </div>
+
+                <div className="min-w-0">
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={handleFileChange}
+                    disabled={sending}
+                    className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-brand-900 file:px-4 file:py-2 file:text-sm file:font-extrabold file:text-white hover:file:bg-brand-800"
+                  />
+
+                  <p className="text-xs text-slate-500 mt-2">
+                    PDF o imagen. Máximo 5 MB.
+                  </p>
+                </div>
+              </div>
+
+              {documento && (
+                <p className="text-sm font-semibold text-brand-950 mt-4 truncate">
+                  Archivo seleccionado: {documento.name}
+                </p>
+              )}
+            </div>
+          </label>
+
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={sending}
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl border border-slate-200 bg-white text-slate-700 font-extrabold hover:bg-slate-50 disabled:opacity-60 transition"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={sending}
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-extrabold hover:bg-brand-800 disabled:opacity-60 transition"
+            >
+              {sending ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Send size={18} />
+              )}
+              Enviar justificación
+            </button>
+          </div>
+        </form>
       </section>
     </div>
   );
@@ -655,6 +952,51 @@ function getDaysAgo(days) {
   date.setDate(date.getDate() - days);
 
   return date.toISOString().slice(0, 10);
+}
+
+function getPeruNowParts() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(new Date());
+
+  const map = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return {
+    date: `${map.year}-${map.month}-${map.day}`,
+    hour: Number(map.hour),
+    minute: Number(map.minute)
+  };
+}
+
+function isWithinJustificationWindow(value) {
+  const dateOnly = getDateOnly(value);
+  const now = getPeruNowParts();
+
+  console.log({
+    fechaAsistencia: dateOnly,
+    fechaPeruActual: now.date,
+    limite: import.meta.env.VITE_JUSTIFICATION_LIMIT_MINUTES
+  });
+
+  if (!dateOnly || dateOnly !== now.date) {
+    return false;
+  }
+
+  const currentMinutes = now.hour * 60 + now.minute;
+
+  const limitMinutes = Number(
+    import.meta.env.VITE_JUSTIFICATION_LIMIT_MINUTES || 18 * 60
+  );
+
+  return currentMinutes <= limitMinutes;
 }
 
 export default MyAttendance;

@@ -7,7 +7,9 @@ import {
   getStudentGrades,
   getClassroomCourseSummary,
   getRiskStudents,
-  getMyGrades
+  getMyGrades,
+  getAcademicAlertRequests,
+  resolveAcademicAlertRequest
 } from '../controllers/gradesNotes.controller.js';
 
 import {
@@ -64,6 +66,20 @@ router.get(
   verifyToken,
   authorizeRoles('Estudiante', 'Apoderado'),
   getMyGrades
+);
+
+router.get(
+  '/alerts',
+  verifyToken,
+  authorizeRoles('Docente', 'Director', 'Administrativo'),
+  getAcademicAlertRequests
+);
+
+router.patch(
+  '/alerts/:id/resolve',
+  verifyToken,
+  authorizeRoles('Docente', 'Director', 'Administrativo'),
+  resolveAcademicAlertRequest
 );
 
 router.get(

@@ -26,6 +26,9 @@ import enrollmentFormatsRoutes from './routes/enrollmentFormats.routes.js';
 import annualResultsRoutes from './routes/annualResults.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import rolesRoutes from './routes/roles.routes.js';
+import notificationsRoutes from './routes/notifications.routes.js';
+import calendarRoutes from './routes/calendar.routes.js';
+import reinforcementRoutes from './routes/reinforcement.routes.js';
 
 const app = express();
 
@@ -63,5 +66,8 @@ app.use('/api/enrollment-formats', enrollmentFormatsRoutes);
 app.use('/api/annual-results', annualResultsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/reinforcements', reinforcementRoutes);
 
 export default app;

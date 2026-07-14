@@ -3,7 +3,8 @@ import express from 'express';
 import {
   getStats,
   getTeacherDashboard,
-  getAuxiliaryDashboard
+  getAuxiliaryDashboard,
+  getDirectorDashboard
 } from '../controllers/dashboard.controller.js';
 
 import {
@@ -18,6 +19,13 @@ router.get(
   verifyToken,
   authorizeRoles('Director', 'Administrativo'),
   getStats
+);
+
+router.get(
+  '/director',
+  verifyToken,
+  authorizeRoles('Director', 'Administrativo'),
+  getDirectorDashboard
 );
 
 router.get(

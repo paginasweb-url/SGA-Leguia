@@ -63,6 +63,10 @@ import GuardianChildren from './pages/guardians/GuardianChildren';
 
 import AuxiliaryStudents from './pages/students/AuxiliaryStudents';
 
+import AcademicCalendar from './pages/calendar/AcademicCalendar';
+
+import ReinforcementsPage from './pages/reinforcements/ReinforcementsPage';
+
 const protectedElement = (element, roles = null) => {
   return (
     <ProtectedRoute>
@@ -160,6 +164,24 @@ function App() {
           )}
         />
         <Route
+          path="/director/reinforcements"
+          element={protectedElement(
+            <DashboardLayout>
+              <ReinforcementsPage />
+            </DashboardLayout>,
+            ['Director']
+          )}
+        />
+        <Route
+          path="/director/calendar"
+          element={protectedElement(
+            <DashboardLayout>
+              <AcademicCalendar />
+            </DashboardLayout>,
+            ['Director']
+          )}
+        />
+        <Route
           path="/director/schedules"
           element={protectedElement(
             <DashboardLayout>
@@ -252,10 +274,28 @@ function App() {
           )}
         />
         <Route
+          path="/admin/calendar"
+          element={protectedElement(
+            <DashboardLayout>
+              <AcademicCalendar />
+            </DashboardLayout>,
+            ['Administrativo']
+          )}
+        />
+        <Route
           path="/admin/enrollments"
           element={protectedElement(
             <DashboardLayout>
               <EnrollmentRequestsAdmin />
+            </DashboardLayout>,
+            ['Administrativo']
+          )}
+        />
+        <Route
+          path="/admin/reinforcements"
+          element={protectedElement(
+            <DashboardLayout>
+              <ReinforcementsPage />
             </DashboardLayout>,
             ['Administrativo']
           )}
@@ -326,6 +366,24 @@ function App() {
           )}
         />
         <Route
+          path="/auxiliary/calendar"
+          element={protectedElement(
+            <DashboardLayout>
+              <AcademicCalendar />
+            </DashboardLayout>,
+            ['Auxiliar']
+          )}
+        />
+        <Route
+          path="/auxiliary/reinforcements"
+          element={protectedElement(
+            <DashboardLayout>
+              <ReinforcementsPage />
+            </DashboardLayout>,
+            ['Auxiliar']
+          )}
+        />
+        <Route
           path="/auxiliary/reports"
           element={protectedElement(
             <DashboardLayout>
@@ -358,6 +416,24 @@ function App() {
           element={protectedElement(
             <DashboardLayout>
               <TeacherCourses />
+            </DashboardLayout>,
+            ['Docente']
+          )}
+        />
+        <Route
+          path="/teacher/calendar"
+          element={protectedElement(
+            <DashboardLayout>
+              <AcademicCalendar />
+            </DashboardLayout>,
+            ['Docente']
+          )}
+        />
+        <Route
+          path="/teacher/reinforcements"
+          element={protectedElement(
+            <DashboardLayout>
+              <ReinforcementsPage />
             </DashboardLayout>,
             ['Docente']
           )}
@@ -455,6 +531,24 @@ function App() {
           )}
         />
         <Route
+          path="/student/reinforcements"
+          element={protectedElement(
+            <DashboardLayout>
+              <ReinforcementsPage />
+            </DashboardLayout>,
+            ['Estudiante']
+          )}
+        />
+        <Route
+          path="/student/calendar"
+          element={protectedElement(
+            <DashboardLayout>
+              <AcademicCalendar />
+            </DashboardLayout>,
+            ['Estudiante']
+          )}
+        />
+        <Route
           path="/student/grades"
           element={protectedElement(
             <DashboardLayout>
@@ -515,6 +609,24 @@ function App() {
           element={protectedElement(
             <DashboardLayout>
               <MyGrades />
+            </DashboardLayout>,
+            ['Apoderado']
+          )}
+        />
+        <Route
+          path="/guardian/calendar"
+          element={protectedElement(
+            <DashboardLayout>
+              <AcademicCalendar />
+            </DashboardLayout>,
+            ['Apoderado']
+          )}
+        />
+        <Route
+          path="/guardian/reinforcements"
+          element={protectedElement(
+            <DashboardLayout>
+              <ReinforcementsPage />
             </DashboardLayout>,
             ['Apoderado']
           )}
