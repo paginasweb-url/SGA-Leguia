@@ -1,7 +1,7 @@
 import api from './api';
 
 export const getDirectorDashboardReport = async () => {
-  const response = await api.get('/reports/dashboard');
+  const response = await api.get('/dashboard/director');
   return response.data;
 };
 

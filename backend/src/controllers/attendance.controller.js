@@ -6,7 +6,13 @@ import {
   getAttendanceByStudent,
   getAttendanceSummaryByClassroom,
   getActiveClassroomsForAttendance,
-  getAttendanceForUser
+  getAttendanceForUser,
+  createAttendanceJustification,
+  getAttendanceJustifications,
+  reviewAttendanceJustification,
+  downloadAttendanceJustificationFile,
+  getAttendanceAlerts,
+  resolveAttendanceAlert
 } from '../services/attendance.service.js';
 
 const getTodayDate = () => {
@@ -238,6 +244,187 @@ export const getMyAttendance = async (req, res) => {
     console.error(error);
 
     res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const createAttendanceJustificationRequest = async (req, res) => {
+  try {
+    const { asistencia_id, motivo } = req.body;
+
+    if (!asistencia_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'La asistencia es obligatoria'
+      });
+    }
+
+    if (!motivo || !String(motivo).trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'El motivo de la justificación es obligatorio'
+      });
+    }
+
+    const justification = await createAttendanceJustification({
+      asistenciaId: asistencia_id,
+      motivo: String(motivo).trim(),
+      file: req.file || null,
+      userId: req.user.id,
+      rol: req.user.rol
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Justificación enviada correctamente',
+      data: justification
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getAttendanceJustificationRequests = async (req, res) => {
+  try {
+    const justifications = await getAttendanceJustifications({
+      userId: req.user.id,
+      rol: req.user.rol
+    });
+
+    res.json({
+      success: true,
+      data: justifications
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const reviewAttendanceJustificationRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { estado, respuesta } = req.body;
+
+    if (!['aprobado', 'rechazado'].includes(estado)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Estado de revisión no válido'
+      });
+    }
+
+    const justification = await reviewAttendanceJustification({
+      id,
+      estado,
+      respuesta: respuesta || null,
+      reviewedBy: req.user.id
+    });
+
+    res.json({
+      success: true,
+      message:
+        estado === 'aprobado'
+          ? 'Justificación aprobada correctamente'
+          : 'Justificación rechazada correctamente',
+      data: justification
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const downloadAttendanceJustificationDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const file = await downloadAttendanceJustificationFile({
+      id,
+      userId: req.user.id,
+      rol: req.user.rol
+    });
+
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(file.fileName)}"`
+    );
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    res.send(file.buffer);
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getAttendanceAlertRequests = async (req, res) => {
+  try {
+    const { estado } = req.query;
+
+    const alerts = await getAttendanceAlerts({
+      estado
+    });
+
+    res.json({
+      success: true,
+      data: alerts
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const resolveAttendanceAlertRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { observacion } = req.body;
+
+    const alert = await resolveAttendanceAlert({
+      id,
+      resolvedBy: req.user.id,
+      observacion: observacion || null
+    });
+
+    res.json({
+      success: true,
+      message: 'Alerta marcada como resuelta correctamente',
+      data: alert
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(400).json({
       success: false,
       error: error.message
     });

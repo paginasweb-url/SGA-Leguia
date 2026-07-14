@@ -22,6 +22,8 @@ import {
   getTeacherAssignmentsForGrades
 } from '../../services/gradesNotes.service';
 
+import AcademicAlertsPanel from '../../components/AcademicAlertsPanel';
+
 function getArray(response) {
   if (Array.isArray(response?.data)) return response.data;
   if (Array.isArray(response)) return response;
@@ -303,6 +305,11 @@ function GradesAdmin() {
         <CounterCard icon={BookOpen} label="Pendientes" value={counters.pending} description="Sin nota" />
         <CounterCard icon={AlertCircle} label="En riesgo" value={counters.risk} description="Nota C" />
       </section>
+
+      <AcademicAlertsPanel
+        title="Alertas académicas institucionales"
+        description="Alertas por bajo rendimiento generadas automáticamente cuando un estudiante obtiene C en un curso."
+      />
 
       <section className="bg-white border border-slate-200 rounded-3xl shadow-soft p-5">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

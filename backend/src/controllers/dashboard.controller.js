@@ -1,7 +1,8 @@
 import {
   getDashboardStats,
   getTeacherDashboardByUserId,
-  getAuxiliaryDashboardByUserId
+  getAuxiliaryDashboardByUserId,
+  getDirectorDashboardReport
 } from '../services/dashboard.service.js';
 
 export const getStats = async (req, res) => {
@@ -57,6 +58,25 @@ export const getAuxiliaryDashboard = async (req, res) => {
         error: 'No se encontró el usuario auxiliar'
       });
     }
+
+    res.json({
+      success: true,
+      data: dashboard
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const getDirectorDashboard = async (req, res) => {
+  try {
+    const dashboard = await getDirectorDashboardReport();
 
     res.json({
       success: true,

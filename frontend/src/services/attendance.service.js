@@ -67,3 +67,145 @@ export const getClassroomAttendanceByRange = async ({
 
   return response.data;
 };
+
+export const createAttendanceJustification = async ({
+  asistenciaId,
+  motivo,
+  documento
+}) => {
+  const formData = new FormData();
+
+  formData.append('asistencia_id', asistenciaId);
+  formData.append('motivo', motivo);
+
+  if (documento) {
+    formData.append('documento', documento);
+  }
+
+  const response = await api.post(
+    '/attendance/justifications',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  );
+
+  return response.data;
+};
+
+export const getAttendanceJustifications = async () => {
+  const response = await api.get('/attendance/justifications');
+  return response.data;
+};
+
+export const reviewAttendanceJustification = async ({
+  id,
+  estado,
+  respuesta
+}) => {
+  const response = await api.patch(
+    `/attendance/justifications/${id}/review`,
+    {
+      estado,
+      respuesta
+    }
+  );
+
+  return response.data;
+};
+
+const getFileNameFromDisposition = (disposition, fallbackFileName) => {
+  if (!disposition) return fallbackFileName;
+
+  const match = disposition.match(/filename="?([^"]+)"?/);
+
+  if (match?.[1]) {
+    return decodeURIComponent(match[1]);
+  }
+
+  return fallbackFileName;
+};
+
+export const viewAttendanceJustificationDocument = async (id) => {
+  const response = await api.get(
+    `/attendance/justifications/${id}/download`,
+    {
+      responseType: 'blob'
+    }
+  );
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/octet-stream'
+  });
+
+  const url = window.URL.createObjectURL(blob);
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+
+  setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+  }, 60000);
+};
+
+export const downloadAttendanceJustificationDocument = async ({
+  id,
+  fallbackFileName = 'justificacion'
+}) => {
+  const response = await api.get(
+    `/attendance/justifications/${id}/download`,
+    {
+      responseType: 'blob'
+    }
+  );
+
+  const fileName = getFileNameFromDisposition(
+    response.headers['content-disposition'],
+    fallbackFileName
+  );
+
+  const blob = new Blob([response.data], {
+    type: response.headers['content-type'] || 'application/octet-stream'
+  });
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = fileName;
+
+  document.body.appendChild(link);
+  link.click();
+
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const getAttendanceAlerts = async (estado = 'activa') => {
+  const params = {};
+
+  if (estado && estado !== 'todos') {
+    params.estado = estado;
+  }
+
+  const response = await api.get('/attendance/alerts', {
+    params
+  });
+
+  return response.data;
+};
+
+export const resolveAttendanceAlert = async ({
+  id,
+  observacion
+}) => {
+  const response = await api.patch(
+    `/attendance/alerts/${id}/resolve`,
+    {
+      observacion
+    }
+  );
+
+  return response.data;
+};

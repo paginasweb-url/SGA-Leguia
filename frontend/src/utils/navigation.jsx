@@ -135,6 +135,44 @@ export const navigationItems = [
     roles: ['Apoderado']
   },
 
+    // Calendario académico
+  {
+    label: 'Calendario',
+    path: '/director/calendar',
+    icon: CalendarDays,
+    roles: ['Director']
+  },
+  {
+    label: 'Calendario',
+    path: '/admin/calendar',
+    icon: CalendarDays,
+    roles: ['Administrativo']
+  },
+  {
+    label: 'Calendario',
+    path: '/teacher/calendar',
+    icon: CalendarDays,
+    roles: ['Docente']
+  },
+  {
+    label: 'Calendario',
+    path: '/auxiliary/calendar',
+    icon: CalendarDays,
+    roles: ['Auxiliar']
+  },
+  {
+    label: 'Calendario',
+    path: '/student/calendar',
+    icon: CalendarDays,
+    roles: ['Estudiante']
+  },
+  {
+    label: 'Calendario',
+    path: '/guardian/calendar',
+    icon: CalendarDays,
+    roles: ['Apoderado']
+  },
+
   // Asistencia
   {
     label: 'Asistencia',
@@ -210,6 +248,44 @@ export const navigationItems = [
     label: 'Notas',
     path: '/guardian/grades',
     icon: ClipboardList,
+    roles: ['Apoderado']
+  },
+
+    // Reforzamiento académico
+  {
+    label: 'Reforzamiento',
+    path: '/director/reinforcements',
+    icon: GraduationCap,
+    roles: ['Director']
+  },
+  {
+    label: 'Reforzamiento',
+    path: '/admin/reinforcements',
+    icon: GraduationCap,
+    roles: ['Administrativo']
+  },
+  {
+    label: 'Reforzamiento',
+    path: '/auxiliary/reinforcements',
+    icon: GraduationCap,
+    roles: ['Auxiliar']
+  },
+  {
+    label: 'Reforzamiento',
+    path: '/teacher/reinforcements',
+    icon: GraduationCap,
+    roles: ['Docente']
+  },
+  {
+    label: 'Reforzamiento',
+    path: '/student/reinforcements',
+    icon: GraduationCap,
+    roles: ['Estudiante']
+  },
+  {
+    label: 'Reforzamiento',
+    path: '/guardian/reinforcements',
+    icon: GraduationCap,
     roles: ['Apoderado']
   },
 
@@ -378,7 +454,9 @@ export const getMobileMenuByRole = (role) => {
         '/director/enrollments',
         '/director/users',
         '/director/attendance',
+        '/director/calendar',
         '/director/security',
+        '/director/reinforcements',
         '/director/settings'
       ].includes(item.path)
     );
@@ -391,7 +469,9 @@ export const getMobileMenuByRole = (role) => {
         '/admin/enrollments',
         '/admin/users',
         '/admin/formats',
+        '/admin/calendar',
         '/admin/announcements',
+        '/admin/reinforcements',
         '/admin/settings'
       ].includes(item.path)
     );
@@ -403,8 +483,10 @@ export const getMobileMenuByRole = (role) => {
         '/dashboard',
         '/auxiliary/attendance',
         '/auxiliary/students',
+        '/auxiliary/calendar',
         '/auxiliary/announcements',
         '/auxiliary/reports',
+        '/auxiliary/reinforcements',
         '/auxiliary/settings'
       ].includes(item.path)
     );
@@ -418,6 +500,8 @@ export const getMobileMenuByRole = (role) => {
         '/teacher/schedules',
         '/teacher/attendance',
         '/teacher/grades',
+        '/teacher/calendar',
+        '/teacher/reinforcements',
         '/teacher/settings'
       ].includes(item.path)
     );
@@ -430,7 +514,9 @@ export const getMobileMenuByRole = (role) => {
         '/student/schedule',
         '/student/attendance',
         '/student/grades',
+        '/student/calendar',
         '/student/announcements',
+        '/student/reinforcements',
         '/student/settings'
       ].includes(item.path)
     );
@@ -443,7 +529,9 @@ export const getMobileMenuByRole = (role) => {
         '/guardian/children',
         '/guardian/attendance',
         '/guardian/grades',
+        '/guardian/calendar',
         '/guardian/announcements',
+        '/guardian/reinforcements',
         '/guardian/settings'
       ].includes(item.path)
     );

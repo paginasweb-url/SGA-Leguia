@@ -406,3 +406,301 @@ export const getAuxiliaryDashboardByUserId = async (userId) => {
     announcements: announcementsResult.rows
   };
 };
+
+export const getDirectorDashboardReport = async () => {
+  const summaryResult = await pool.query(
+    `
+    SELECT
+      (SELECT COUNT(*)::int FROM users) AS total_usuarios,
+      (SELECT COUNT(*)::int FROM estudiantes) AS total_estudiantes,
+      (SELECT COUNT(*)::int FROM docentes) AS total_docentes,
+      (SELECT COUNT(*)::int FROM apoderados) AS total_apoderados,
+      (SELECT COUNT(*)::int FROM aulas) AS total_aulas,
+      (SELECT COUNT(*)::int FROM cursos) AS total_cursos,
+      (
+        SELECT COUNT(*)::int
+        FROM matriculas
+        WHERE estado = 'aprobado'
+      ) AS matriculas_aprobadas,
+      (
+        SELECT COUNT(*)::int
+        FROM asistencias
+        WHERE fecha::date = CURRENT_DATE
+      ) AS asistencias_hoy,
+      (
+        SELECT COUNT(*)::int
+        FROM asistencias
+        WHERE fecha::date = CURRENT_DATE
+          AND estado = 'presente'
+      ) AS presentes_hoy,
+      (
+        SELECT COUNT(*)::int
+        FROM asistencias
+        WHERE fecha::date = CURRENT_DATE
+          AND estado = 'falta'
+      ) AS faltas_hoy,
+      (
+        SELECT COUNT(*)::int
+        FROM asistencias
+        WHERE fecha::date = CURRENT_DATE
+          AND estado = 'tarde'
+      ) AS tardanzas_hoy,
+      (
+        SELECT COUNT(*)::int
+        FROM asistencias
+        WHERE fecha::date = CURRENT_DATE
+          AND estado = 'justificado'
+      ) AS justificados_hoy,
+      (
+        SELECT COUNT(*)::int
+        FROM justificaciones_asistencia
+        WHERE estado = 'pendiente'
+      ) AS justificaciones_pendientes,
+      (
+        SELECT COUNT(*)::int
+        FROM alertas_asistencia
+        WHERE estado = 'activa'
+      ) AS alertas_asistencia_activas,
+      (
+        SELECT COUNT(*)::int
+        FROM alertas_academicas
+        WHERE estado = 'activa'
+      ) AS alertas_academicas_activas,
+      (
+        SELECT COUNT(*)::int
+        FROM comunicados
+        WHERE fecha >= date_trunc('month', CURRENT_DATE)
+      ) AS comunicados_mes
+    `
+  );
+
+  const attendanceTodayResult = await pool.query(
+    `
+    SELECT
+      estado,
+      COUNT(*)::int AS total
+    FROM asistencias
+    WHERE fecha::date = CURRENT_DATE
+    GROUP BY estado
+    ORDER BY estado ASC
+    `
+  );
+
+  const attendanceLastSevenDaysResult = await pool.query(
+    `
+    WITH dias AS (
+      SELECT generate_series(
+        CURRENT_DATE - INTERVAL '6 days',
+        CURRENT_DATE,
+        INTERVAL '1 day'
+      )::date AS fecha
+    )
+    SELECT
+      d.fecha,
+      COUNT(a.id)::int AS total,
+      COUNT(a.id) FILTER (WHERE a.estado = 'presente')::int AS presentes,
+      COUNT(a.id) FILTER (WHERE a.estado = 'falta')::int AS faltas,
+      COUNT(a.id) FILTER (WHERE a.estado = 'tarde')::int AS tardanzas,
+      COUNT(a.id) FILTER (WHERE a.estado = 'justificado')::int AS justificados
+    FROM dias d
+    LEFT JOIN asistencias a
+      ON a.fecha::date = d.fecha
+    GROUP BY d.fecha
+    ORDER BY d.fecha ASC
+    `
+  );
+
+  const attendanceAlertsResult = await pool.query(
+    `
+    SELECT
+      aa.id,
+      aa.estudiante_id,
+      aa.aula_id,
+      aa.cantidad_faltas,
+      aa.fecha_inicio,
+      aa.fecha_fin,
+      aa.mensaje,
+      aa.estado,
+      aa.created_at,
+
+      ue.nombres || ' ' || ue.apellidos AS estudiante,
+      ue.dni AS estudiante_dni,
+
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      a.turno
+    FROM alertas_asistencia aa
+    INNER JOIN estudiantes e
+      ON aa.estudiante_id = e.id
+    INNER JOIN users ue
+      ON e.user_id = ue.id
+    INNER JOIN aulas a
+      ON aa.aula_id = a.id
+    INNER JOIN grados g
+      ON a.grado_id = g.id
+    INNER JOIN secciones s
+      ON a.seccion_id = s.id
+    WHERE aa.estado = 'activa'
+    ORDER BY aa.created_at DESC
+    LIMIT 6
+    `
+  );
+
+  const academicAlertsResult = await pool.query(
+    `
+    SELECT
+      aa.id,
+      aa.estudiante_id,
+      aa.curso_id,
+      aa.aula_id,
+      aa.periodo_id,
+      aa.bimestre,
+      aa.nota_detectada,
+      aa.mensaje,
+      aa.estado,
+      aa.created_at,
+
+      ue.nombres || ' ' || ue.apellidos AS estudiante,
+      ue.dni AS estudiante_dni,
+
+      c.nombre AS curso,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      a.turno,
+      p.nombre AS periodo
+    FROM alertas_academicas aa
+    INNER JOIN estudiantes e
+      ON aa.estudiante_id = e.id
+    INNER JOIN users ue
+      ON e.user_id = ue.id
+    INNER JOIN cursos c
+      ON aa.curso_id = c.id
+    INNER JOIN aulas a
+      ON aa.aula_id = a.id
+    INNER JOIN grados g
+      ON a.grado_id = g.id
+    INNER JOIN secciones s
+      ON a.seccion_id = s.id
+    INNER JOIN periodos_academicos p
+      ON aa.periodo_id = p.id
+    WHERE aa.estado = 'activa'
+    ORDER BY aa.created_at DESC
+    LIMIT 6
+    `
+  );
+
+  const pendingJustificationsResult = await pool.query(
+    `
+    SELECT
+      ja.id,
+      ja.asistencia_id,
+      ja.estudiante_id,
+      ja.motivo,
+      ja.estado,
+      ja.created_at,
+
+      a.fecha AS fecha_asistencia,
+      a.estado AS estado_asistencia,
+
+      ue.nombres || ' ' || ue.apellidos AS estudiante,
+      ue.dni AS estudiante_dni,
+
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      au.turno
+    FROM justificaciones_asistencia ja
+    INNER JOIN asistencias a
+      ON ja.asistencia_id = a.id
+    INNER JOIN estudiantes e
+      ON ja.estudiante_id = e.id
+    INNER JOIN users ue
+      ON e.user_id = ue.id
+    LEFT JOIN aulas au
+      ON a.aula_id = au.id
+    LEFT JOIN grados g
+      ON au.grado_id = g.id
+    LEFT JOIN secciones s
+      ON au.seccion_id = s.id
+    WHERE ja.estado = 'pendiente'
+    ORDER BY ja.created_at DESC
+    LIMIT 6
+    `
+  );
+
+  const recentAnnouncementsResult = await pool.query(
+    `
+    SELECT
+      c.id,
+      c.titulo,
+      c.contenido,
+      c.destinatario_tipo,
+      c.aula_id,
+      c.fecha,
+      c.created_at,
+      u.nombres || ' ' || u.apellidos AS publicado_por_nombre,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      a.turno
+    FROM comunicados c
+    LEFT JOIN users u
+      ON c.publicado_por = u.id
+    LEFT JOIN aulas a
+      ON c.aula_id = a.id
+    LEFT JOIN grados g
+      ON a.grado_id = g.id
+    LEFT JOIN secciones s
+      ON a.seccion_id = s.id
+    ORDER BY c.fecha DESC
+    LIMIT 5
+    `
+  );
+
+  const academicAlertsByCourseResult = await pool.query(
+    `
+    SELECT
+      c.nombre AS curso,
+      COUNT(*)::int AS total
+    FROM alertas_academicas aa
+    INNER JOIN cursos c
+      ON aa.curso_id = c.id
+    WHERE aa.estado = 'activa'
+    GROUP BY c.nombre
+    ORDER BY total DESC, c.nombre ASC
+    LIMIT 5
+    `
+  );
+
+  const classroomAttendanceTodayResult = await pool.query(
+    `
+    SELECT
+      au.id AS aula_id,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      au.turno,
+      COUNT(a.id)::int AS registros_hoy
+    FROM aulas au
+    INNER JOIN grados g
+      ON au.grado_id = g.id
+    INNER JOIN secciones s
+      ON au.seccion_id = s.id
+    LEFT JOIN asistencias a
+      ON a.aula_id = au.id
+      AND a.fecha::date = CURRENT_DATE
+    GROUP BY au.id, g.nombre, s.nombre, au.turno
+    ORDER BY registros_hoy ASC, g.nombre ASC, s.nombre ASC
+    LIMIT 8
+    `
+  );
+
+  return {
+    summary: summaryResult.rows[0],
+    attendance_today: attendanceTodayResult.rows,
+    attendance_last_7_days: attendanceLastSevenDaysResult.rows,
+    active_attendance_alerts: attendanceAlertsResult.rows,
+    active_academic_alerts: academicAlertsResult.rows,
+    pending_justifications: pendingJustificationsResult.rows,
+    recent_announcements: recentAnnouncementsResult.rows,
+    academic_alerts_by_course: academicAlertsByCourseResult.rows,
+    classroom_attendance_today: classroomAttendanceTodayResult.rows
+  };
+};

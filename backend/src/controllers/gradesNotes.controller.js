@@ -11,7 +11,9 @@ import {
   studentOwnsGrades,
   guardianCanAccessGrades,
   getStudentProfileByUserId,
-  getGuardianChildrenForGrades
+  getGuardianChildrenForGrades,
+  getAcademicAlerts,
+  resolveAcademicAlert
 } from '../services/gradesNotes.service.js';
 
 export const getClassroomStudentsForGrades = async (req, res) => {
@@ -100,7 +102,8 @@ export const registerGrades = async (req, res) => {
       curso_id,
       periodo_id,
       bimestre,
-      notas
+      notas,
+      userId
     });
 
     res.status(201).json({
@@ -352,5 +355,60 @@ export const getMyGrades = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const getAcademicAlertRequests = async (req, res) => {
+  try {
+    const { estado } = req.query;
+    const { id: userId, rol } = req.user;
+
+    const alerts = await getAcademicAlerts({
+      estado,
+      userId,
+      rol
+    });
+
+    res.json({
+      success: true,
+      data: alerts
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const resolveAcademicAlertRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { observacion } = req.body;
+    const { id: userId, rol } = req.user;
+
+    const alert = await resolveAcademicAlert({
+      id,
+      resolvedBy: userId,
+      rol,
+      observacion: observacion || null
+    });
+
+    res.json({
+      success: true,
+      message: 'Alerta académica marcada como resuelta correctamente',
+      data: alert
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
   }
 };

@@ -22,12 +22,323 @@ export const getStudentsForGrades = async (aulaId, periodoId) => {
   return result.rows;
 };
 
+const formatBimesterLabel = (bimestre) => {
+  const labels = {
+    B1: 'Bimestre 1',
+    B2: 'Bimestre 2',
+    B3: 'Bimestre 3',
+    B4: 'Bimestre 4'
+  };
+
+  return labels[bimestre] || bimestre;
+};
+
+const getAcademicAlertContext = async ({
+  client,
+  estudianteId,
+  cursoId,
+  aulaId,
+  periodoId
+}) => {
+  const result = await client.query(
+    `
+    SELECT
+      e.id AS estudiante_id,
+      e.user_id AS estudiante_user_id,
+      ue.nombres || ' ' || ue.apellidos AS estudiante,
+      ue.dni AS estudiante_dni,
+
+      c.id AS curso_id,
+      c.nombre AS curso,
+
+      a.id AS aula_id,
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      a.turno,
+
+      p.id AS periodo_id,
+      p.nombre AS periodo
+    FROM estudiantes e
+    INNER JOIN users ue
+      ON e.user_id = ue.id
+    INNER JOIN cursos c
+      ON c.id = $2
+    INNER JOIN aulas a
+      ON a.id = $3
+    INNER JOIN grados g
+      ON a.grado_id = g.id
+    INNER JOIN secciones s
+      ON a.seccion_id = s.id
+    INNER JOIN periodos_academicos p
+      ON p.id = $4
+    WHERE e.id = $1
+    LIMIT 1
+    `,
+    [
+      estudianteId,
+      cursoId,
+      aulaId,
+      periodoId
+    ]
+  );
+
+  return result.rows[0] || null;
+};
+
+const getGuardianUsersForAcademicAlert = async ({
+  client,
+  estudianteId
+}) => {
+  const result = await client.query(
+    `
+    SELECT DISTINCT
+      u.id AS user_id,
+      u.nombres,
+      u.apellidos,
+      u.telefono
+    FROM estudiante_apoderado ea
+    INNER JOIN apoderados ap
+      ON ea.apoderado_id = ap.id
+    INNER JOIN users u
+      ON ap.user_id = u.id
+    WHERE ea.estudiante_id = $1
+      AND u.id IS NOT NULL
+      AND COALESCE(u.estado, 'activo') = 'activo'
+    `,
+    [estudianteId]
+  );
+
+  return result.rows;
+};
+
+const createAcademicNotifications = async ({
+  client,
+  estudianteId,
+  estudianteUserId,
+  mensaje
+}) => {
+  let total = 0;
+
+  if (estudianteUserId) {
+    await client.query(
+      `
+      INSERT INTO notificaciones (
+        user_id,
+        tipo,
+        mensaje,
+        estado,
+        fecha,
+        created_at
+      )
+      VALUES ($1, 'alerta_academica', $2, 'no_leida', NOW(), NOW())
+      `,
+      [
+        estudianteUserId,
+        mensaje
+      ]
+    );
+
+    total += 1;
+  }
+
+  const guardians = await getGuardianUsersForAcademicAlert({
+    client,
+    estudianteId
+  });
+
+  for (const guardian of guardians) {
+    await client.query(
+      `
+      INSERT INTO notificaciones (
+        user_id,
+        tipo,
+        mensaje,
+        estado,
+        fecha,
+        created_at
+      )
+      VALUES ($1, 'alerta_academica', $2, 'no_leida', NOW(), NOW())
+      `,
+      [
+        guardian.user_id,
+        mensaje
+      ]
+    );
+
+    total += 1;
+  }
+
+  return total;
+};
+
+const createAcademicAlertIfNeeded = async ({
+  client,
+  notaId,
+  estudianteId,
+  cursoId,
+  aulaId,
+  periodoId,
+  bimestre,
+  nota,
+  generatedBy
+}) => {
+  if (nota !== 'C') {
+    return null;
+  }
+
+  const context = await getAcademicAlertContext({
+    client,
+    estudianteId,
+    cursoId,
+    aulaId,
+    periodoId
+  });
+
+  if (!context) {
+    return null;
+  }
+
+  const bimesterLabel = formatBimesterLabel(bimestre);
+
+  const classroomName = `${context.grado || ''} ${context.seccion || ''} ${context.turno || ''}`.trim();
+
+  const mensaje = `${context.estudiante} registra bajo rendimiento en ${context.curso} durante el ${bimesterLabel} con calificación C. Se recomienda realizar seguimiento académico.`;
+
+  const insertResult = await client.query(
+    `
+    INSERT INTO alertas_academicas (
+      nota_id,
+      estudiante_id,
+      curso_id,
+      aula_id,
+      periodo_id,
+      bimestre,
+      nota_detectada,
+      tipo,
+      mensaje,
+      estado,
+      generada_por,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      $1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      'C',
+      'bajo_rendimiento',
+      $7,
+      'activa',
+      $8,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (
+      estudiante_id,
+      curso_id,
+      aula_id,
+      periodo_id,
+      bimestre,
+      tipo
+    )
+    WHERE estado = 'activa'
+    DO NOTHING
+    RETURNING *
+    `,
+    [
+      notaId,
+      estudianteId,
+      cursoId,
+      aulaId,
+      periodoId,
+      bimestre,
+      mensaje,
+      generatedBy
+    ]
+  );
+
+  if (insertResult.rows.length === 0) {
+    return null;
+  }
+
+  const alert = insertResult.rows[0];
+
+  const notificationsCreated = await createAcademicNotifications({
+    client,
+    estudianteId,
+    estudianteUserId: context.estudiante_user_id,
+    mensaje
+  });
+
+  return {
+    ...alert,
+    estudiante: context.estudiante,
+    curso: context.curso,
+    grado: context.grado,
+    seccion: context.seccion,
+    turno: context.turno,
+    periodo: context.periodo,
+    notificaciones_generadas: notificationsCreated,
+    aula: classroomName
+  };
+};
+
+const resolveActiveAcademicAlertIfNeeded = async ({
+  client,
+  estudianteId,
+  cursoId,
+  aulaId,
+  periodoId,
+  bimestre,
+  nota,
+  resolvedBy
+}) => {
+  if (nota === 'C') {
+    return null;
+  }
+
+  const result = await client.query(
+    `
+    UPDATE alertas_academicas
+    SET
+      estado = 'resuelta',
+      resuelta_por = $6,
+      fecha_resolucion = NOW(),
+      observacion_resolucion = $7,
+      updated_at = NOW()
+    WHERE estudiante_id = $1
+      AND curso_id = $2
+      AND aula_id = $3
+      AND periodo_id = $4
+      AND bimestre = $5
+      AND tipo = 'bajo_rendimiento'
+      AND estado = 'activa'
+    RETURNING *
+    `,
+    [
+      estudianteId,
+      cursoId,
+      aulaId,
+      periodoId,
+      bimestre,
+      resolvedBy,
+      `Alerta resuelta automáticamente porque la nota cambió de C a ${nota}.`
+    ]
+  );
+
+  return result.rows[0] || null;
+};
+
 export const saveGrades = async ({
   aula_id,
   curso_id,
   periodo_id,
   bimestre,
-  notas
+  notas,
+  userId
 }) => {
   const client = await pool.connect();
 
@@ -83,6 +394,9 @@ export const saveGrades = async ({
       throw new Error('El aula no existe');
     }
 
+    const generatedAcademicAlerts = [];
+    const resolvedAcademicAlerts = [];
+
     for (const item of notas) {
       const { estudiante_id, nota, comentario } = item;
 
@@ -104,7 +418,11 @@ export const saveGrades = async ({
           AND estado = 'aprobado'
         LIMIT 1
         `,
-        [estudiante_id, aula_id, periodo_id]
+        [
+          estudiante_id,
+          aula_id,
+          periodo_id
+        ]
       );
 
       if (enrollmentCheck.rows.length === 0) {
@@ -113,7 +431,7 @@ export const saveGrades = async ({
         );
       }
 
-      await client.query(
+      const savedGradeResult = await client.query(
         `
         INSERT INTO notas (
           estudiante_id,
@@ -130,6 +448,7 @@ export const saveGrades = async ({
         DO UPDATE SET
           nota = EXCLUDED.nota,
           comentario = EXCLUDED.comentario
+        RETURNING *
         `,
         [
           estudiante_id,
@@ -141,6 +460,39 @@ export const saveGrades = async ({
           comentario || null
         ]
       );
+
+      const savedGrade = savedGradeResult.rows[0];
+
+      const generatedAlert = await createAcademicAlertIfNeeded({
+        client,
+        notaId: savedGrade.id,
+        estudianteId: estudiante_id,
+        cursoId: curso_id,
+        aulaId: aula_id,
+        periodoId: periodo_id,
+        bimestre,
+        nota,
+        generatedBy: userId
+      });
+
+      if (generatedAlert) {
+        generatedAcademicAlerts.push(generatedAlert);
+      }
+
+      const resolvedAlert = await resolveActiveAcademicAlertIfNeeded({
+        client,
+        estudianteId: estudiante_id,
+        cursoId: curso_id,
+        aulaId: aula_id,
+        periodoId: periodo_id,
+        bimestre,
+        nota,
+        resolvedBy: userId
+      });
+
+      if (resolvedAlert) {
+        resolvedAcademicAlerts.push(resolvedAlert);
+      }
     }
 
     await client.query('COMMIT');
@@ -150,7 +502,11 @@ export const saveGrades = async ({
       curso_id,
       periodo_id,
       bimestre,
-      total_registros: notas.length
+      total_registros: notas.length,
+      alertas_academicas_generadas: generatedAcademicAlerts.length,
+      alertas_academicas_resueltas: resolvedAcademicAlerts.length,
+      alertas_generadas: generatedAcademicAlerts,
+      alertas_resueltas: resolvedAcademicAlerts
     };
 
   } catch (error) {
@@ -456,4 +812,171 @@ export const getGuardianChildrenForGrades = async (guardianUserId) => {
 
   const result = await pool.query(query, [guardianUserId]);
   return result.rows;
+};
+
+export const getAcademicAlerts = async ({
+  estado,
+  userId,
+  rol
+} = {}) => {
+  const values = [];
+
+  let query = `
+    SELECT
+      aa.id,
+      aa.nota_id,
+      aa.estudiante_id,
+      aa.curso_id,
+      aa.aula_id,
+      aa.periodo_id,
+      aa.bimestre,
+      aa.nota_detectada,
+      aa.tipo,
+      aa.mensaje,
+      aa.estado,
+      aa.generada_por,
+      aa.resuelta_por,
+      aa.fecha_resolucion,
+      aa.observacion_resolucion,
+      aa.created_at,
+      aa.updated_at,
+
+      e.codigo_estudiante,
+      ue.nombres || ' ' || ue.apellidos AS estudiante,
+      ue.dni AS estudiante_dni,
+
+      c.nombre AS curso,
+
+      g.nombre AS grado,
+      s.nombre AS seccion,
+      a.turno,
+
+      p.nombre AS periodo,
+
+      ug.nombres || ' ' || ug.apellidos AS generada_por_nombre,
+      ur.nombres || ' ' || ur.apellidos AS resuelta_por_nombre
+    FROM alertas_academicas aa
+    INNER JOIN estudiantes e
+      ON aa.estudiante_id = e.id
+    INNER JOIN users ue
+      ON e.user_id = ue.id
+    INNER JOIN cursos c
+      ON aa.curso_id = c.id
+    INNER JOIN aulas a
+      ON aa.aula_id = a.id
+    INNER JOIN grados g
+      ON a.grado_id = g.id
+    INNER JOIN secciones s
+      ON a.seccion_id = s.id
+    INNER JOIN periodos_academicos p
+      ON aa.periodo_id = p.id
+    LEFT JOIN users ug
+      ON aa.generada_por = ug.id
+    LEFT JOIN users ur
+      ON aa.resuelta_por = ur.id
+    WHERE aa.tipo = 'bajo_rendimiento'
+  `;
+
+  if (estado && ['activa', 'resuelta'].includes(estado)) {
+    values.push(estado);
+
+    query += `
+      AND aa.estado = $${values.length}
+    `;
+  }
+
+  if (rol === 'Docente') {
+    values.push(userId);
+
+    query += `
+      AND EXISTS (
+        SELECT 1
+        FROM docentes d
+        INNER JOIN docente_curso dc
+          ON dc.docente_id = d.id
+        WHERE d.user_id = $${values.length}
+          AND dc.aula_id = aa.aula_id
+          AND dc.curso_id = aa.curso_id
+      )
+    `;
+  }
+
+  query += `
+    ORDER BY
+      CASE WHEN aa.estado = 'activa' THEN 0 ELSE 1 END,
+      aa.created_at DESC
+  `;
+
+  const result = await pool.query(query, values);
+  return result.rows;
+};
+
+const teacherCanResolveAcademicAlert = async ({
+  alertId,
+  userId
+}) => {
+  const result = await pool.query(
+    `
+    SELECT aa.id
+    FROM alertas_academicas aa
+    INNER JOIN docentes d
+      ON d.user_id = $2
+    INNER JOIN docente_curso dc
+      ON dc.docente_id = d.id
+      AND dc.aula_id = aa.aula_id
+      AND dc.curso_id = aa.curso_id
+    WHERE aa.id = $1
+    LIMIT 1
+    `,
+    [
+      alertId,
+      userId
+    ]
+  );
+
+  return result.rows.length > 0;
+};
+
+export const resolveAcademicAlert = async ({
+  id,
+  resolvedBy,
+  rol,
+  observacion
+}) => {
+  if (rol === 'Docente') {
+    const canResolve = await teacherCanResolveAcademicAlert({
+      alertId: id,
+      userId: resolvedBy
+    });
+
+    if (!canResolve) {
+      throw new Error('Solo puedes resolver alertas de tus cursos asignados');
+    }
+  }
+
+  const result = await pool.query(
+    `
+    UPDATE alertas_academicas
+    SET
+      estado = 'resuelta',
+      resuelta_por = $2,
+      fecha_resolucion = NOW(),
+      observacion_resolucion = $3,
+      updated_at = NOW()
+    WHERE id = $1
+      AND estado = 'activa'
+    RETURNING *
+    `,
+    [
+      id,
+      resolvedBy,
+      observacion || 'Alerta académica marcada como resuelta manualmente.'
+    ]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error('La alerta académica no existe o ya fue resuelta');
+  }
+
+  return result.rows[0];
 };
