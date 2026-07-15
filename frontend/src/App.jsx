@@ -67,6 +67,8 @@ import AcademicCalendar from './pages/calendar/AcademicCalendar';
 
 import ReinforcementsPage from './pages/reinforcements/ReinforcementsPage';
 
+import SupportPage from './pages/support/SupportPage';
+
 const protectedElement = (element, roles = null) => {
   return (
     <ProtectedRoute>
@@ -683,6 +685,23 @@ function App() {
               <SettingsAdmin />
             </DashboardLayout>,
             ['Apoderado']
+          )}
+        />
+
+        <Route
+          path="/support"
+          element={protectedElement(
+            <DashboardLayout>
+              <SupportPage />
+            </DashboardLayout>,
+            [
+              'Director',
+              'Administrativo',
+              'Auxiliar',
+              'Docente',
+              'Estudiante',
+              'Apoderado'
+            ]
           )}
         />
 

@@ -65,7 +65,26 @@ const attendanceStates = [
   { value: 'falta', label: 'Falta' }
 ];
 
-const getToday = () => new Date().toISOString().slice(0, 10);
+const getToday = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Lima',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+
+  const map = Object.fromEntries(
+    parts.map((part) => [part.type, part.value])
+  );
+
+  return `${map.year}-${map.month}-${map.day}`;
+};
+
+const isPastDate = (value) => {
+  if (!value) return false;
+
+  return getDateOnly(value) < getToday();
+};
 
 const initialForm = {
   origen: 'manual',
@@ -344,6 +363,11 @@ function ReinforcementsPage() {
       return;
     }
 
+    if (isPastDate(form.fecha)) {
+      toast.error('No se puede consultar disponibilidad para una fecha pasada.');
+      return;
+    }
+
     if (!reinforcementShift) {
       toast.error('Selecciona un aula de origen para calcular el turno opuesto.');
       return;
@@ -429,6 +453,11 @@ function ReinforcementsPage() {
 
   const handleSave = async (event) => {
     event.preventDefault();
+
+    if (isPastDate(form.fecha)) {
+      toast.error('No se puede crear o actualizar un reforzamiento con una fecha pasada.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -978,6 +1007,8 @@ function ReinforcementFormModal({
 }) {
   const isEditing = Boolean(editing);
 
+  const selectedPastDate = isPastDate(form.fecha);
+
   return (
     <div className="fixed inset-0 z-[90] bg-brand-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6">
       <section className="relative bg-white w-full sm:max-w-5xl rounded-t-3xl sm:rounded-3xl shadow-soft border border-slate-200 max-h-[92vh] overflow-y-auto">
@@ -1098,6 +1129,7 @@ function ReinforcementFormModal({
               <input
                 type="date"
                 value={form.fecha}
+                min={getToday()}
                 onChange={(event) => setForm((prev) => ({ ...prev, fecha: event.target.value }))}
                 required
                 disabled={saving}
@@ -1129,6 +1161,16 @@ function ReinforcementFormModal({
               />
             </label>
           </div>
+
+            {selectedPastDate && (
+              <div className="bg-red-50 border border-red-100 text-danger rounded-2xl p-4 flex gap-3">
+                <AlertCircle size={20} className="shrink-0 mt-0.5" />
+
+                <p className="text-sm font-semibold">
+                  La fecha seleccionada corresponde a un día pasado. Selecciona la fecha actual o una fecha futura para programar el reforzamiento.
+                </p>
+              </div>
+            )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <SelectField
@@ -1304,7 +1346,7 @@ function ReinforcementFormModal({
 
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || selectedPastDate}
               className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-brand-900 text-white font-extrabold hover:bg-brand-800 disabled:opacity-60 transition"
             >
               {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
