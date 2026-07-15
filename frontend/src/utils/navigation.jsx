@@ -13,7 +13,8 @@ import {
   Settings,
   GraduationCap,
   UserRound,
-  Home
+  Home,
+  LifeBuoy
 } from 'lucide-react';
 
 export const roleHomePath = {
@@ -401,6 +402,21 @@ export const navigationItems = [
     roles: ['Administrativo']
   },
 
+  // Soporte TIC
+  {
+    label: 'Soporte TIC',
+    path: '/support',
+    icon: LifeBuoy,
+    roles: [
+      'Director',
+      'Administrativo',
+      'Auxiliar',
+      'Docente',
+      'Estudiante',
+      'Apoderado'
+    ]
+  },
+
   // Configuración
   {
     label: 'Configuración',
@@ -457,6 +473,7 @@ export const getMobileMenuByRole = (role) => {
         '/director/calendar',
         '/director/security',
         '/director/reinforcements',
+        '/support',
         '/director/settings'
       ].includes(item.path)
     );
@@ -472,6 +489,7 @@ export const getMobileMenuByRole = (role) => {
         '/admin/calendar',
         '/admin/announcements',
         '/admin/reinforcements',
+        '/support',
         '/admin/settings'
       ].includes(item.path)
     );
@@ -487,6 +505,7 @@ export const getMobileMenuByRole = (role) => {
         '/auxiliary/announcements',
         '/auxiliary/reports',
         '/auxiliary/reinforcements',
+        '/support',
         '/auxiliary/settings'
       ].includes(item.path)
     );
@@ -502,6 +521,7 @@ export const getMobileMenuByRole = (role) => {
         '/teacher/grades',
         '/teacher/calendar',
         '/teacher/reinforcements',
+        '/support',
         '/teacher/settings'
       ].includes(item.path)
     );
@@ -517,6 +537,7 @@ export const getMobileMenuByRole = (role) => {
         '/student/calendar',
         '/student/announcements',
         '/student/reinforcements',
+        '/support',
         '/student/settings'
       ].includes(item.path)
     );
@@ -532,6 +553,7 @@ export const getMobileMenuByRole = (role) => {
         '/guardian/calendar',
         '/guardian/announcements',
         '/guardian/reinforcements',
+        '/support',
         '/guardian/settings'
       ].includes(item.path)
     );
